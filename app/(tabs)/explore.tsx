@@ -5,7 +5,6 @@ import { eventsAPI } from '@/lib/api/events';
 import { useRouter } from 'expo-router';
 import React, { useMemo, useState, useEffect, useRef } from 'react';
 import { getEventImageUrl, getProfileImageUrl } from '@/lib/utils/imageUtils';
-import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import {
   Animated,
   FlatList,
@@ -13,7 +12,6 @@ import {
   NativeSyntheticEvent,
   Text,
   TextInput,
-  TouchableOpacity,
   View,
   Platform,
   RefreshControl,
@@ -123,8 +121,8 @@ export default function ExploreScreen() {
     );
   }, [events, searchQuery]);
 
-  const safeTop = 60 + insets.top;
-  const headerContentHeight = 52 + 56; // logo row + search input row with padding
+  const safeTop = insets.top + 12;
+  const headerContentHeight = 56; // search/filter input row with padding
   const headerHeight = safeTop + headerContentHeight;
 
   const handleScroll = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
@@ -158,17 +156,8 @@ export default function ExploreScreen() {
           className="bg-white border-b border-gray-200"
           style={{ paddingTop: safeTop }}
         >
-          <View className="px-5 pb-3  flex-row items-center justify-between">
-            <View className="w-10" />
-            <Text className="text-2xl font-bold text-gray-900">ticketly</Text>
-            <TouchableOpacity
-              className="w-10 h-10 items-center justify-center"
-              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-            >
-              <MaterialIcons name="search" size={26} color="#111827" />
-            </TouchableOpacity>
-          </View>
-          <View className="px-5 pb-4">
+          {/* Filters at top of page */}
+          <View className="px-3 pb-4">
             <TextInput
               className="bg-gray-50 border border-gray-200 rounded-xl py-3 px-4 text-gray-900 text-sm"
               placeholder="Search by event..."
@@ -186,7 +175,7 @@ export default function ExploreScreen() {
           style={{ flex: 1 }}
           contentContainerStyle={{
             paddingTop: headerHeight,
-            padding: 20,
+            paddingHorizontal: 12,
             paddingBottom: bottomPadding,
           }}
           showsVerticalScrollIndicator={false}
@@ -211,7 +200,7 @@ export default function ExploreScreen() {
           style={{ flex: 1 }}
           contentContainerStyle={{
             paddingTop: headerHeight,
-            padding: 20,
+            paddingHorizontal: 12,
             paddingBottom: bottomPadding,
           }}
           onScroll={handleScroll}
@@ -219,7 +208,7 @@ export default function ExploreScreen() {
           renderItem={({ item }) => <EventCard event={item} />}
           keyExtractor={(item) => item.id}
           numColumns={2}
-          columnWrapperStyle={{ justifyContent: 'space-between' }}
+          columnWrapperStyle={{ justifyContent: 'space-between', marginBottom: 8 }}
           refreshControl={
             <RefreshControl
               refreshing={refreshing}

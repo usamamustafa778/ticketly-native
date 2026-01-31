@@ -94,7 +94,7 @@ export const QRScanner: React.FC<QRScannerProps> = ({ visible, onClose, onScan }
     >
       <View className="flex-1 bg-black">
         {/* Header */}
-        <View className="absolute top-0 left-0 right-0 z-10 bg-black/50 pt-[50px] pb-4 px-5">
+        <View className="absolute top-0 left-0 right-0 z-10 bg-black/50 pt-[50px] pb-4 px-3">
           <View className="flex-row items-center justify-between">
             <Text className="text-white text-xl font-bold">Scan QR Code</Text>
             <TouchableOpacity

@@ -76,8 +76,8 @@ const getApiBaseUrl = (): string => {
 // Use the environment-aware function for automatic URL detection
 // export const API_BASE_URL = getApiBaseUrl();
 // Or hardcode production URL for all devices:
-// export const API_BASE_URL = "https://ticketlybackend-production.up.railway.app/api";
-export const API_BASE_URL = "http://localhost:5001/api";
+export const API_BASE_URL = "https://ticketly-backend-oem4.onrender.com/api";
+// export const API_BASE_URL = "http://localhost:5001/api";
 
 
 // Log the API URL being used (for debugging)

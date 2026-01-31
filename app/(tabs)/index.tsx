@@ -1,31 +1,27 @@
 import { EventCard } from '@/components/EventCard';
 import { EventCardSkeleton } from '@/components/EventCardSkeleton';
-import { useAppStore } from '@/store/useAppStore';
-import { eventsAPI } from '@/lib/api/events';
-import { useRouter } from 'expo-router';
-import React, { useEffect, useState, useRef, useMemo } from 'react';
-import { getEventImageUrl, getProfileImageUrl } from '@/lib/utils/imageUtils';
-import { API_BASE_URL } from '@/lib/config';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import { PROFILE_CACHE_KEY } from '@/lib/api/auth';
-import { useFocusEffect } from 'expo-router';
-import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { Modal } from '@/components/Modal';
+import { PROFILE_CACHE_KEY } from '@/lib/api/auth';
+import type { Event } from '@/lib/api/events';
+import { eventsAPI } from '@/lib/api/events';
+import { API_BASE_URL } from '@/lib/config';
+import { getEventImageUrl, getProfileImageUrl } from '@/lib/utils/imageUtils';
+import { useAppStore } from '@/store/useAppStore';
+import MaterialIcons from '@expo/vector-icons/MaterialIcons';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useFocusEffect, useRouter } from 'expo-router';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
+  Animated,
   Dimensions,
-  Image,
+  Platform,
+  RefreshControl,
   ScrollView,
   Text,
   TouchableOpacity,
-  View,
-  ActivityIndicator,
-  NativeScrollEvent,
-  NativeSyntheticEvent,
-  Animated,
-  Easing,
-  Platform,
-  RefreshControl,
+  View
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 export type HomeFilter =
   | 'all'
@@ -131,8 +127,6 @@ function eventMatchesFilter(event: { date: string; organizerId?: string }, filte
   }
   return true;
 }
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import type { Event } from '@/lib/api/events';
 
 const { width } = Dimensions.get('window');
 const CARD_WIDTH = width * 0.82; // 82% of screen width for better peek effect
@@ -255,8 +249,6 @@ export default function HomeScreen() {
   const scrollViewRef = useRef<ScrollView>(null);
   const scrollX = useRef(new Animated.Value(0)).current;
   const animatedScales = useRef<Animated.Value[]>([]);
-  const lastScrollY = useRef(0);
-  const headerTranslateY = useRef(new Animated.Value(0)).current;
 
   // Hydrate user from profile cache when home tab is focused so "My Events" can show createdEvents from localStorage
   useFocusEffect(
@@ -340,28 +332,14 @@ export default function HomeScreen() {
     );
   }, [upcomingEvents, activeFilter, user?._id, user?.createdEvents]);
 
-  const safeTop = 60 + insets.top;
-  const headerRowHeight = 52;
-  const filterRowHeight = 44;
-  const headerHeight = safeTop + headerRowHeight + filterRowHeight;
-
-  const handleScroll = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
-    const y = e.nativeEvent.contentOffset.y;
-    const diff = y - lastScrollY.current;
-    if (y <= 30) {
-      Animated.timing(headerTranslateY, { toValue: 0, duration: 200, useNativeDriver: true }).start();
-    } else if (diff > 15) {
-      Animated.timing(headerTranslateY, { toValue: -headerHeight, duration: 200, useNativeDriver: true }).start();
-    } else if (diff < -15) {
-      Animated.timing(headerTranslateY, { toValue: 0, duration: 200, useNativeDriver: true }).start();
-    }
-    lastScrollY.current = y;
-  };
+  const safeTop = insets.top + 12;
+  const filterRowHeight = 36;
+  const headerHeight = safeTop + filterRowHeight;
 
   return (
     <View className="flex-1 bg-white">
-      {/* Header: hides when scrolling down, shows when scrolling up */}
-      <Animated.View
+      {/* Header: fixed filter bar at top */}
+      <View
         pointerEvents="box-none"
         style={{
           position: 'absolute',
@@ -369,7 +347,6 @@ export default function HomeScreen() {
           left: 0,
           right: 0,
           zIndex: 10,
-          transform: [{ translateY: headerTranslateY }],
         }}
       >
         <View
@@ -377,22 +354,11 @@ export default function HomeScreen() {
           style={{ paddingTop: safeTop }}
           pointerEvents="box-none"
         >
-          <View className="px-5 pb-3 flex-row items-center justify-between" pointerEvents="box-none">
-            <View className="w-10" />
-            <Text className="text-2xl font-bold text-gray-900">ticketly</Text>
-            <TouchableOpacity
-              className="w-10 h-10 items-center justify-center"
-              onPress={() => router.push('/(tabs)/explore')}
-              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-            >
-              <MaterialIcons name="search" size={26} color="#111827" />
-            </TouchableOpacity>
-          </View>
-          {/* Filter chips: sticky with header on scroll up */}
+          {/* Filters at top of page */}
           <ScrollView
             horizontal
             showsHorizontalScrollIndicator={false}
-            contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 12 }}
+            contentContainerStyle={{ paddingHorizontal: 12, paddingBottom: 8 }}
             className="flex-row"
           >
             {FILTER_OPTIONS.map(({ key, label }) => {
@@ -401,16 +367,10 @@ export default function HomeScreen() {
                 <TouchableOpacity
                   key={key}
                   onPress={() => setActiveFilter(key)}
-                  className="rounded-full px-4 py-2 mr-2"
-                  style={{
-                    backgroundColor: isActive ? '#FEF2F2' : '#F3F4F6',
-                    borderWidth: isActive ? 2 : 0,
-                    borderColor: isActive ? '#DC2626' : 'transparent',
-                  }}
+                  className={`rounded-lg px-2.5 py-1.5 mr-1.5 ${isActive ? 'bg-red-50 border-b-2 border-red-600' : 'bg-gray-100 border-b-0'}`}
                 >
                   <Text
-                    className="text-sm font-semibold"
-                    style={{ color: isActive ? '#DC2626' : '#6B7280' }}
+                    className={`text-xs font-semibold ${isActive ? 'text-red-600' : 'text-gray-500'}`}
                   >
                     {label}
                   </Text>
@@ -419,15 +379,13 @@ export default function HomeScreen() {
             })}
           </ScrollView>
         </View>
-      </Animated.View>
+      </View>
 
-      {/* Content: paddingTop so list starts below header; header hides on scroll down, shows on scroll up */}
+      {/* Content: paddingTop so list starts below fixed header */}
       <ScrollView
         className="flex-1"
         contentContainerStyle={{ paddingTop: headerHeight, paddingBottom: bottomPadding }}
         showsVerticalScrollIndicator={false}
-        onScroll={handleScroll}
-        scrollEventThrottle={16}
         overScrollMode="always"
         refreshControl={
           <RefreshControl
@@ -439,19 +397,19 @@ export default function HomeScreen() {
         }
       >
         {/* Upcoming Events */}
-        <View className="px-5 pt-5">
+        <View className="px-3 pt-5">
           <Text className="text-gray-900 text-xl font-bold mb-4">Upcoming Events</Text>
           {loading ? (
-            <View className="flex-row flex-wrap justify-between">
-              {[1, 2, 3, 4, 5, 6].map((i) => (
-                <EventCardSkeleton key={i} />
-              ))}
-            </View>
+<View className="flex-row flex-wrap justify-between">
+            {[1, 2, 3, 4, 5, 6].map((i) => (
+              <EventCardSkeleton key={i} />
+            ))}
+          </View>
           ) : filteredEvents.length === 0 ? (
             <View className="py-14 items-center justify-center">
               <MaterialIcons name="event-busy" size={48} color="#4B5563" />
               <Text className="text-[#9CA3AF] text-base font-medium mt-3">No data found</Text>
-              <Text className="text-[#6B7280] text-sm mt-1 text-center px-6">
+              <Text className="text-[#6B7280] text-sm mt-1 text-center px-3">
                 {activeFilter === 'myevents'
                   ? "You haven't created any events yet."
                   : upcomingEvents.length === 0

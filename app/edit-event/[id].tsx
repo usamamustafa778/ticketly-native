@@ -356,7 +356,7 @@ export default function EditEventScreen() {
         contentContainerStyle={{ paddingBottom: 40 }}
         showsVerticalScrollIndicator={false}
       >
-        <View className="flex-row items-center justify-between pt-[60px] px-5 pb-5">
+        <View className="flex-row items-center justify-between pt-[60px] px-3 pb-5">
           <TouchableOpacity onPress={() => router.back()}>
             <MaterialIcons name="arrow-back" size={24} color="#111827" />
           </TouchableOpacity>
@@ -364,7 +364,7 @@ export default function EditEventScreen() {
           <View style={{ width: 30 }} />
         </View>
 
-        <View className="px-5">
+        <View className="px-3">
           <Text className="text-gray-900 text-sm font-semibold mb-2 mt-4">Name</Text>
           <TextInput
             className="bg-gray-50 border border-gray-200 rounded-xl py-3.5 px-4 text-gray-900 text-base"

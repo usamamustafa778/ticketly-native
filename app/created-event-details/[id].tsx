@@ -493,7 +493,7 @@ export default function CreatedEventDetailsScreen() {
           </View>
 
           {/* Tabs Section */}
-          <View className="px-5 pt-5 pb-4 bg-white">
+          <View className="px-3 pt-5 pb-4 bg-white">
             <ScrollView
               horizontal
               showsHorizontalScrollIndicator={false}
@@ -525,7 +525,7 @@ export default function CreatedEventDetailsScreen() {
         </View>
 
         {/* Update Ticket Status Section */}
-        <View className="px-5 mt-4 mb-2">
+        <View className="px-3 mt-4 mb-2">
           <TouchableOpacity
             className="bg-primary py-4 px-5 rounded-xl flex-row items-center justify-center"
             onPress={() => setUpdateModalOpen(true)}
@@ -536,7 +536,7 @@ export default function CreatedEventDetailsScreen() {
         </View>
 
         {/* Tickets List */}
-        <View className="px-5 mt-2">
+        <View className="px-3 mt-2">
           {loadingTickets ? (
             <View className="py-10 items-center">
               <ActivityIndicator size="large" color="#DC2626" />

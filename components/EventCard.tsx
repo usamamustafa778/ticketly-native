@@ -58,7 +58,7 @@ export const EventCard: React.FC<EventCardProps> = ({ event, onPress }) => {
 
   return (
     <TouchableOpacity
-      className="bg-[#1F1F1F] rounded-md overflow-hidden mb-2 w-[49%]"
+      className="bg-[#1F1F1F] rounded-md overflow-hidden w-[49%] mb-2"
       onPress={handlePress}
       activeOpacity={0.8}
     >
@@ -142,7 +142,7 @@ export const EventCard: React.FC<EventCardProps> = ({ event, onPress }) => {
           })}{' '}
           {event.time}
         </Text>
-        <Text className="text-white text-[13px] font-semibold mb-2" numberOfLines={2}>
+        <Text className="text-white text-[13px] font-semibold mb-2" numberOfLines={1}>
           {event.title}
         </Text>
         {/* <View className="flex-row items-center">

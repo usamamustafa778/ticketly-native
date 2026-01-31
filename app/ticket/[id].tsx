@@ -381,7 +381,7 @@ export default function TicketScreen() {
       }
     >
       {/* Header */}
-      <View className="flex-row items-center justify-between pt-[60px] px-5 pb-5 bg-white">
+      <View className="flex-row items-center justify-between pt-[60px] px-3 pb-5 bg-white">
         <TouchableOpacity onPress={() => router.back()}>
           <MaterialIcons name="arrow-back" size={24} color="#111827" />
         </TouchableOpacity>
@@ -390,11 +390,11 @@ export default function TicketScreen() {
       </View>
 
       {/* Ticket Card - Paper Style */}
-      <View className="mx-5 mb-6">
+      <View className="mx-3 mb-6">
         <View className="bg-white rounded-xl overflow-hidden relative shadow-lg" style={{ elevation: 8 }}>
           {/* Perforated left edge */}
           <View className="absolute left-0 top-0 bottom-0 w-3 border-l-2 border-primary border-dashed" />
-          <View className="pl-6 pr-5 py-5">
+          <View className="px-3 py-5">
             {/* Header: Logo, Title, Tagline */}
             <View className="items-center mb-3">
               <Text className="text-lg font-bold text-primary tracking-wide mb-2">ticketly</Text>
@@ -474,7 +474,7 @@ export default function TicketScreen() {
 
       {/* Payment section - separate card below ticket */}
       {(ticket.status === 'payment_in_review' || ticket.status === 'pending_payment') && (
-        <View className="mx-5 mt-4 mb-6 bg-white rounded-2xl p-5 border border-gray-200">
+        <View className="mx-3 mt-4 mb-6 bg-white rounded-2xl p-5 border border-gray-200">
         {ticket.status === 'payment_in_review' && (
           <View>
             <View className="items-center mb-4">
@@ -743,7 +743,7 @@ export default function TicketScreen() {
       )}
 
       {/* Ticket Footer */}
-      <View className="mx-5 mb-6 p-5 rounded-2xl bg-gray-100 border border-gray-200">
+      <View className="mx-3 mb-6 p-5 rounded-2xl bg-gray-100 border border-gray-200">
         <Text className="text-gray-700 text-xs text-center mb-1">
           This ticket is valid for one person only
         </Text>
@@ -754,7 +754,7 @@ export default function TicketScreen() {
 
       {/* Actions */}
       {ticket.status === 'confirmed' && (
-        <View className="flex-row gap-3 px-5">
+        <View className="flex-row gap-3 px-3">
           <TouchableOpacity
             className="flex-1 bg-primary py-4 rounded-xl items-center"
             onPress={() => {

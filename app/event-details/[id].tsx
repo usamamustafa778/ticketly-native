@@ -344,7 +344,7 @@ export default function EventDetailsScreen() {
         </View>
 
         {/* Event Info Card */}
-        <View className="bg-white rounded-t-3xl p-5 -mt-5 border-t border-gray-200">
+        <View className="bg-white rounded-t-3xl p-3 -mt-5 border-t border-gray-200">
           <View className="flex-row justify-between items-center mb-6">
             <Text className="text-gray-900 text-2xl font-bold flex-1 mr-3">{event.title}</Text>
             <TouchableOpacity

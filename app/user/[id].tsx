@@ -164,7 +164,7 @@ export default function UserProfileScreen() {
         }
       >
         {/* Header - Back button */}
-        <View className="flex-row justify-end items-center px-5 pt-5 pb-2">
+        <View className="flex-row justify-end items-center px-3 pt-5 pb-2">
           <TouchableOpacity
             className="bg-gray-100 w-10 h-10 rounded-lg items-center justify-center"
             onPress={() => router.back()}
@@ -208,7 +208,7 @@ export default function UserProfileScreen() {
         </View>
 
         {/* Stats (compact, like profile page) */}
-        <View className="flex-row justify-around px-5 py-2">
+        <View className="flex-row justify-around px-3 py-2">
           <View className="items-center">
             <Text className="text-gray-900 text-base font-bold mb-0.5">{createdEvents.length}</Text>
             <Text className="text-[#9CA3AF] text-[10px]">Created</Text>
@@ -224,7 +224,7 @@ export default function UserProfileScreen() {
         </View>
 
         {/* Tabs */}
-        <View className="flex-row px-5 py-2 mb-3 gap-2 bg-white">
+        <View className="flex-row px-3 py-2 mb-3 gap-2 bg-white">
           <TouchableOpacity
             className={`flex-1 py-2 items-center rounded-md ${activeTab === 'created' ? 'bg-primary' : 'bg-gray-100'}`}
             onPress={() => setActiveTab('created')}
@@ -258,7 +258,7 @@ export default function UserProfileScreen() {
         </View>
 
         {/* Events List */}
-        <View className="px-5 mb-8">
+        <View className="px-3 mb-8">
           {currentEvents.length === 0 ? (
             <View className="py-10 items-center">
               <MaterialIcons name="event-busy" size={48} color="#4B5563" />

@@ -64,7 +64,10 @@ export default function TabLayout() {
       <Tabs.Screen
         name="explore"
         options={{
-          href: null, // Hide from tab bar, accessible via navigation
+          title: 'Search',
+          tabBarIcon: ({ color, size }) => (
+            <MaterialIcons name="search" size={size} color={color} />
+          ),
         }}
       />
     </Tabs>

@@ -245,7 +245,7 @@ export default function SettingsScreen() {
         }
       >
         {/* Header */}
-        <View className="flex-row items-center pt-[60px] px-4 pb-4 border-b border-gray-200">
+        <View className="flex-row items-center pt-[60px] px-3 pb-4 border-b border-gray-200">
           <TouchableOpacity onPress={() => router.back()} className="p-2 -ml-2" activeOpacity={0.7}>
             <MaterialIcons name="arrow-back" size={24} color="#111827" />
           </TouchableOpacity>
@@ -253,7 +253,7 @@ export default function SettingsScreen() {
         </View>
 
         {/* List */}
-        <View className="px-4 pt-4">
+        <View className="px-3 pt-4">
           {/* Edit Profile */}
           <TouchableOpacity
             className="flex-row items-center justify-between py-4 border-b border-gray-200"

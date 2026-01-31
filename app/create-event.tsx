@@ -1,25 +1,25 @@
+import { Modal } from '@/components/Modal';
+import { authAPI } from '@/lib/api/auth';
+import { eventsAPI, type EventPrice } from '@/lib/api/events';
+import { useAppStore } from '@/store/useAppStore';
+import MaterialIcons from '@expo/vector-icons/MaterialIcons';
+import DateTimePicker from '@react-native-community/datetimepicker';
+import * as ImagePicker from 'expo-image-picker';
+import { useRouter } from 'expo-router';
 import React, { useState } from 'react';
 import {
-  View,
+  ActivityIndicator,
+  Image,
+  KeyboardAvoidingView,
+  Platform,
+  Pressable,
+  Modal as RNModal,
+  ScrollView,
   Text,
   TextInput,
   TouchableOpacity,
-  ScrollView,
-  KeyboardAvoidingView,
-  Platform,
-  Image,
-  ActivityIndicator,
-  Modal as RNModal,
-  Pressable,
+  View,
 } from 'react-native';
-import { useRouter } from 'expo-router';
-import { useAppStore } from '@/store/useAppStore';
-import { eventsAPI, type EventPrice } from '@/lib/api/events';
-import { authAPI } from '@/lib/api/auth';
-import { Modal } from '@/components/Modal';
-import DateTimePicker from '@react-native-community/datetimepicker';
-import MaterialIcons from '@expo/vector-icons/MaterialIcons';
-import * as ImagePicker from 'expo-image-picker';
 
 interface EventFormData {
   // Step 1 - Event Details
@@ -444,7 +444,7 @@ export default function CreateEventScreen() {
                 <MaterialIcons name="location-on" size={20} color="#9CA3AF" />
               </View>
               <TextInput
-                className="flex-1 text-white text-base"
+                className="flex-1 text-gray-900 text-base"
                 placeholder="e.g. Islamabad, Pakistan"
                 placeholderTextColor="#6B7280"
                 value={formData.address}
@@ -460,7 +460,7 @@ export default function CreateEventScreen() {
               <View className={iconWrap}>
                 <MaterialIcons name="person-outline" size={20} color="#9CA3AF" />
               </View>
-              <Text className="text-white">{formData.genderSelection}</Text>
+              <Text className="text-gray-900">{formData.genderSelection}</Text>
               <MaterialIcons name="expand-more" size={20} color="#9CA3AF" />
             </TouchableOpacity>
             {errors.genderSelection ? <Text className="text-[#EF4444] text-xs mb-3">{errors.genderSelection}</Text> : null}
