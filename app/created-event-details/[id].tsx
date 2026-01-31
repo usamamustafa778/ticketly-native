@@ -15,6 +15,7 @@ import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useAppStore } from '@/store/useAppStore';
 import { eventsAPI, type Event } from '@/lib/api/events';
 import { ticketsAPI } from '@/lib/api/tickets';
+import { BackButton } from '@/components/BackButton';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { getEventImageUrl } from '@/lib/utils/imageUtils';
 import { QRScanner } from '@/components/QRScanner';
@@ -372,12 +373,11 @@ export default function CreatedEventDetailsScreen() {
             className="w-full h-full"
             resizeMode="cover"
           />
-          <TouchableOpacity
-            className="absolute top-[50px] left-5 bg-black/50 w-10 h-10 rounded-full items-center justify-center"
+          <BackButton
+            variant="dark"
+            className="absolute top-[50px] left-5"
             onPress={() => router.back()}
-          >
-            <MaterialIcons name="arrow-back" size={20} color="#FFFFFF" />
-          </TouchableOpacity>
+          />
           <TouchableOpacity
             className="absolute top-[50px] right-5 bg-primary w-10 h-10 rounded-full items-center justify-center"
             onPress={() => {

@@ -9,7 +9,6 @@ export default function CreateTabScreen() {
 
     const onRefresh = useCallback(async () => {
         setRefreshing(true);
-        // No data to refresh; just show pull feedback for consistency with other tabs
         setTimeout(() => setRefreshing(false), 400);
     }, []);
 
@@ -35,7 +34,7 @@ export default function CreateTabScreen() {
                 </Text>
                 <TouchableOpacity
                     className="bg-primary py-4 px-8 rounded-xl"
-                    onPress={() => router.push('/create-event')}
+                    onPress={() => router.push('/create/create-event')}
                 >
                     <Text className="text-white text-base font-semibold">Get Started</Text>
                 </TouchableOpacity>
@@ -43,4 +42,3 @@ export default function CreateTabScreen() {
         </ScrollView>
     );
 }
-

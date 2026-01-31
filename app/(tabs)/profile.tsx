@@ -92,11 +92,10 @@ export default function ProfileScreen() {
   const currentUserIdRef = useRef<string | null>(null);
 
   // Calculate bottom padding: tab bar height + safe area bottom + extra padding
-  // Tab bar layout: iOS height=90 (includes paddingBottom=30), Android height=75 + paddingBottom + marginBottom=10
-  // Total space from bottom: iOS = 90 + insets.bottom, Android = 75 + max(insets.bottom, 50) + 10 + insets.bottom
+  // Tab bar layout: compact bar with insets.bottom for devices with home indicator / gesture bar
   const tabBarTotalHeight = Platform.OS === 'ios'
-    ? 90 + insets.bottom // iOS: height includes padding, add safe area
-    : 75 + Math.max(insets.bottom, 50) + 10 + insets.bottom; // Android: height + paddingBottom + marginBottom + safe area
+    ? 56 + Math.max(insets.bottom, 6)
+    : 52 + Math.max(insets.bottom, 6) + 2;
   const bottomPadding = tabBarTotalHeight + 20; // Extra 20px for comfortable spacing
 
   const TAB_ORDER: ('created' | 'joined' | 'liked')[] = ['created', 'joined', 'liked'];
@@ -115,7 +114,7 @@ export default function ProfileScreen() {
         const { dx, dy } = gestureState;
         return Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > 35;
       },
-      onPanResponderTerminationRequest: () => true,
+      onPanResponderTerminationRequest: () => false,
       onPanResponderRelease: (_, gestureState) => {
         const { dx } = gestureState;
         const SWIPE_THRESHOLD = 40;
@@ -131,44 +130,8 @@ export default function ProfileScreen() {
     })
   ).current;
 
-  // Helper function to get full profile image URL
-  const getProfileImageUrl = (): string | null => {
-    if (!user?.profileImage) return null;
-
-    // If profileImageUrl is provided, prefer it
-    if (user.profileImageUrl) {
-      // If backend returned a localhost URL (old data), rewrite it to use the current API base URL
-      if (
-        user.profileImageUrl.includes('localhost') ||
-        user.profileImageUrl.includes('127.0.0.1')
-      ) {
-        // Strip `/api` from API_BASE_URL and keep only the path part from the original URL
-        const baseUrl = API_BASE_URL.replace('/api', '');
-        try {
-          const url = new URL(user.profileImageUrl);
-          const path = url.pathname || '';
-          return `${baseUrl}${path}`;
-        } catch {
-          // Fallback: if URL parsing fails, try to find `/uploads` in the string
-          const uploadsIndex = user.profileImageUrl.indexOf('/uploads');
-          if (uploadsIndex !== -1) {
-            const path = user.profileImageUrl.substring(uploadsIndex);
-            return `${baseUrl}${path}`;
-          }
-        }
-      }
-      return user.profileImageUrl;
-    }
-
-    // Otherwise, construct from profileImage and API_BASE_URL
-    if (user.profileImage.startsWith('http')) {
-      return user.profileImage;
-    }
-
-    // Remove /api from API_BASE_URL if present, then add profileImage
-    const baseUrl = API_BASE_URL.replace('/api', '');
-    return `${baseUrl}${user.profileImage}`;
-  };
+  // Use shared getProfileImageUrl (supports both profileImage and profileImageUrl)
+  const profileImageUrl = user ? getProfileImageUrl(user) : null;
 
   // Handle image picker
   const pickImage = async () => {
@@ -218,17 +181,15 @@ export default function ProfileScreen() {
       const response = await authAPI.uploadProfileImage(imageUri);
 
       if (response.success) {
-        console.log('✅ Profile image upload successful:', response.profileImage);
+        console.log('✅ Profile image upload successful:', response.profileImageUrl);
 
         // Update user state with new profile image
         if (response.user) {
           setUser(response.user);
-        } else if (user) {
-          // If user object not in response, update profileImage manually
+        } else if (user && response.profileImageUrl) {
           setUser({
             ...user,
-            profileImage: response.profileImage,
-            profileImageUrl: response.profileImageUrl || response.profileImage,
+            profileImageUrl: response.profileImageUrl,
           });
         }
 
@@ -601,9 +562,11 @@ export default function ProfileScreen() {
   const renderEvents = () => {
     if (loading) {
       return (
-        <View className="flex-row flex-wrap justify-between">
+        <View className="grid grid-cols-2 flex-row flex-wrap px-[2px]" style={{ gap: 2 }}>
           {[1, 2, 3, 4, 5, 6].map((i) => (
-            <EventCardSkeleton key={i} />
+            <View key={i} className="flex-[0_0_49%]">
+              <EventCardSkeleton />
+            </View>
           ))}
         </View>
       );
@@ -613,7 +576,7 @@ export default function ProfileScreen() {
       if (joinedEventsData.length === 0) {
         return (
           <TouchableOpacity
-            className="py-10 items-center"
+            className="px-3 py-10 items-center"
             onPress={onRefresh}
             activeOpacity={0.7}
           >
@@ -623,16 +586,17 @@ export default function ProfileScreen() {
       }
 
       return (
-        <View className="flex-row flex-wrap justify-between">
+        <View className="grid grid-cols-2 flex-row flex-wrap px-[2px]" style={{ gap: 2 }}>
           {joinedEventsData.map((joinedEventData, index) => {
             const event = convertEvent(joinedEventData.event);
             const eventId = event.id || `event-${index}`;
             return (
-              <EventCard
-                key={eventId}
-                event={event}
-                onPress={() => eventId && router.push(`/event-details/${eventId}`)}
-              />
+              <View key={eventId} className="flex-[0_0_49%]">
+                <EventCard
+                  event={event}
+                  onPress={() => eventId && router.push(`/event-details/${eventId}`)}
+                />
+              </View>
             );
           })}
         </View>
@@ -646,7 +610,7 @@ export default function ProfileScreen() {
     if (eventsToShow.length === 0) {
       return (
         <TouchableOpacity
-          className="py-10 items-center"
+          className="px-3 py-10 items-center"
           onPress={onRefresh}
           activeOpacity={0.7}
         >
@@ -658,7 +622,7 @@ export default function ProfileScreen() {
     }
 
     return (
-      <View className="flex-row flex-wrap justify-between">
+      <View className="grid grid-cols-2 flex-row flex-wrap px-[2px]" style={{ gap: 2 }}>
         {eventsToShow.map((event) => {
           // Ensure event ID is valid before rendering
           const eventId = event.id || event._id || (event as any)?._id || (event as any)?.id;
@@ -669,17 +633,18 @@ export default function ProfileScreen() {
           }
 
           return (
-            <EventCard
-              key={eventId}
-              event={event}
-              onPress={() => {
-                if (activeTab === 'created') {
-                  router.push(`/created-event-details/${eventId}`);
-                } else {
-                  router.push(`/event-details/${eventId}`);
-                }
-              }}
-            />
+            <View key={eventId} className="flex-[0_0_49%]">
+              <EventCard
+                event={event}
+                onPress={() => {
+                  if (activeTab === 'created') {
+                    router.push(`/created-event-details/${eventId}`);
+                  } else {
+                    router.push(`/event-details/${eventId}`);
+                  }
+                }}
+              />
+            </View>
           );
         })}
       </View>
@@ -722,9 +687,9 @@ export default function ProfileScreen() {
               className="w-[100px] h-[100px] rounded-full overflow-hidden"
             >
               <View className="w-full h-full rounded-full bg-primary items-center justify-center overflow-hidden">
-                {getProfileImageUrl() ? (
+                {profileImageUrl ? (
                   <Image
-                    source={{ uri: getProfileImageUrl()! }}
+                    source={{ uri: profileImageUrl }}
                     className="w-full h-full"
                     resizeMode="cover"
                   />
@@ -763,7 +728,8 @@ export default function ProfileScreen() {
         </View>
 
         {/* Stats */}
-        <View className="flex-row justify-around px-3 py-2">
+        <View className="flex-row justify-around px-16 py-2">
+
           <View className="items-center">
             <Text className="text-gray-900 text-base font-bold mb-0.5">{createdEvents.length}</Text>
             <Text className="text-[#9CA3AF] text-[10px]">Created</Text>
@@ -779,7 +745,7 @@ export default function ProfileScreen() {
         </View>
 
         {/* Tabs - sticky when scrolling */}
-        <View className="flex-row px-3 py-2 mb-3 translate-y-[-2px] gap-2 bg-white">
+        <View className="flex-row px-16 py-2 mb-3 translate-y-[-2px] gap-2 bg-white">
           <TouchableOpacity
             className={`flex-1 py-2 items-center rounded-md ${activeTab === 'created' ? 'bg-primary' : 'bg-gray-100'}`}
             onPress={() => setActiveTab('created')}
@@ -806,8 +772,9 @@ export default function ProfileScreen() {
           </TouchableOpacity>
         </View>
 
+
         {/* Events List - swipe area for tab change */}
-        <View className="px-3 mb-8">
+        <View className="mb-8">
           {renderEvents()}
         </View>
       </ScrollView>
@@ -862,9 +829,9 @@ export default function ProfileScreen() {
           onPress={() => setShowImageViewer(false)}
         >
           <View className="w-[320px] h-[320px] rounded-full overflow-hidden items-center justify-center bg-primary">
-            {getProfileImageUrl() ? (
+            {profileImageUrl ? (
               <Image
-                source={{ uri: getProfileImageUrl()! }}
+                source={{ uri: profileImageUrl }}
                 className="w-full h-full"
                 resizeMode="cover"
               />

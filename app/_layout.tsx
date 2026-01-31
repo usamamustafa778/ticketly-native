@@ -63,7 +63,6 @@ export default function RootLayout() {
           <Stack.Screen name="(tabs)" />
           <Stack.Screen name="login" />
           <Stack.Screen name="settings" />
-          <Stack.Screen name="create-event" />
           <Stack.Screen name="event-details/[id]" />
           <Stack.Screen name="user/[id]" />
           <Stack.Screen name="ticket/[id]" />

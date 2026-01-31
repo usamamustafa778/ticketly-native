@@ -58,7 +58,7 @@ export const EventCard: React.FC<EventCardProps> = ({ event, onPress }) => {
 
   return (
     <TouchableOpacity
-      className="bg-[#1F1F1F] rounded-md overflow-hidden w-[49%] mb-2"
+      className="bg-[#1F1F1F] rounded-md overflow-hidden w-full"
       onPress={handlePress}
       activeOpacity={0.8}
     >

@@ -1,7 +1,7 @@
 import { EventCard } from '@/components/EventCard';
 import { EventCardSkeleton } from '@/components/EventCardSkeleton';
 import { Modal } from '@/components/Modal';
-import { PROFILE_CACHE_KEY } from '@/lib/api/auth';
+import { authAPI, PROFILE_CACHE_KEY } from '@/lib/api/auth';
 import type { Event } from '@/lib/api/events';
 import { eventsAPI } from '@/lib/api/events';
 import { API_BASE_URL } from '@/lib/config';
@@ -14,6 +14,8 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Animated,
   Dimensions,
+  InteractionManager,
+  PanResponder,
   Platform,
   RefreshControl,
   ScrollView,
@@ -45,6 +47,18 @@ const FILTER_OPTIONS: { key: HomeFilter; label: string }[] = [
   { key: 'nextweekend', label: 'Next Weekend' },
   { key: 'thismonth', label: 'This Month' },
 ];
+
+const FILTER_HEADINGS: Record<HomeFilter, string> = {
+  all: 'All Events',
+  myevents: 'My Events',
+  today: "Today's Events",
+  tomorrow: "Tomorrow's Events",
+  thisweek: "This Week's Events",
+  thisweekend: "This Weekend's Events",
+  nextweek: "Next Week's Events",
+  nextweekend: "Next Weekend's Events",
+  thismonth: "This Month's Events",
+};
 
 function getStartOfWeek(d: Date): Date {
   const day = d.getDay();
@@ -128,7 +142,7 @@ function eventMatchesFilter(event: { date: string; organizerId?: string }, filte
   return true;
 }
 
-const { width } = Dimensions.get('window');
+const { width, height } = Dimensions.get('window');
 const CARD_WIDTH = width * 0.82; // 82% of screen width for better peek effect
 const CARD_SPACING = 16; // Space between cards
 const HORIZONTAL_PADDING = (width - CARD_WIDTH) / 2; // Center padding to center the cards
@@ -247,8 +261,39 @@ export default function HomeScreen() {
   const [errorModalMessage, setErrorModalMessage] = useState('');
   const [currentSlide, setCurrentSlide] = useState(0);
   const scrollViewRef = useRef<ScrollView>(null);
+  const filterScrollRef = useRef<ScrollView>(null);
+  const tabLayoutsRef = useRef<Record<string, { x: number; width: number }>>({});
   const scrollX = useRef(new Animated.Value(0)).current;
   const animatedScales = useRef<Animated.Value[]>([]);
+  const activeFilterRef = useRef(activeFilter);
+  activeFilterRef.current = activeFilter;
+
+  const filterPanResponder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => false,
+      onStartShouldSetPanResponderCapture: () => false,
+      onMoveShouldSetPanResponder: (_, gestureState) => {
+        const { dx, dy } = gestureState;
+        return Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > 35;
+      },
+      onMoveShouldSetPanResponderCapture: (_, gestureState) => {
+        const { dx, dy } = gestureState;
+        return Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > 35;
+      },
+      onPanResponderTerminationRequest: () => false,
+      onPanResponderRelease: (_, gestureState) => {
+        const { dx } = gestureState;
+        const SWIPE_THRESHOLD = 40;
+        const currentFilter = activeFilterRef.current;
+        const idx = FILTER_OPTIONS.findIndex((f) => f.key === currentFilter);
+        if (dx < -SWIPE_THRESHOLD && idx < FILTER_OPTIONS.length - 1) {
+          setActiveFilter(FILTER_OPTIONS[idx + 1].key);
+        } else if (dx > SWIPE_THRESHOLD && idx > 0) {
+          setActiveFilter(FILTER_OPTIONS[idx - 1].key);
+        }
+      },
+    })
+  ).current;
 
   // Hydrate user from profile cache when home tab is focused so "My Events" can show createdEvents from localStorage
   useFocusEffect(
@@ -272,11 +317,10 @@ export default function HomeScreen() {
   );
 
   // Calculate bottom padding: tab bar height + safe area bottom + extra padding
-  // Tab bar layout: iOS height=90 (includes paddingBottom=30), Android height=75 + paddingBottom + marginBottom=10
-  // Total space from bottom: iOS = 90 + insets.bottom, Android = 75 + max(insets.bottom, 50) + 10 + insets.bottom
+  // Tab bar layout: compact bar with insets.bottom for devices with home indicator / gesture bar
   const tabBarTotalHeight = Platform.OS === 'ios'
-    ? 90 + insets.bottom // iOS: height includes padding, add safe area
-    : 75 + Math.max(insets.bottom, 50) + 10 + insets.bottom; // Android: height + paddingBottom + marginBottom + safe area
+    ? 56 + Math.max(insets.bottom, 6)
+    : 52 + Math.max(insets.bottom, 6) + 2;
   const bottomPadding = tabBarTotalHeight + 20; // Extra 20px for comfortable spacing
 
   useEffect(() => {
@@ -315,8 +359,14 @@ export default function HomeScreen() {
     }
   };
 
-  const onRefresh = () => {
-    loadEvents(true);
+  const onRefresh = async () => {
+    await loadEvents(true);
+    if (activeFilter === 'myevents' && user?._id) {
+      try {
+        const res = await authAPI.getProfile();
+        if (res.success && res.user) setUser(res.user);
+      } catch (_) {}
+    }
   };
 
   const filteredEvents = useMemo(() => {
@@ -335,6 +385,34 @@ export default function HomeScreen() {
   const safeTop = insets.top + 12;
   const filterRowHeight = 36;
   const headerHeight = safeTop + filterRowHeight;
+  const swipeAreaMinHeight = Math.max(400, height - headerHeight - bottomPadding - 20);
+
+  // Scroll filter bar to show active tab when it changes (tap or swipe)
+  // InteractionManager + delayed retry fixes Expo Go / mobile layout timing
+  useEffect(() => {
+    let timeoutId: ReturnType<typeof setTimeout>;
+    const scrollToActive = () => {
+      if (!filterScrollRef.current) return;
+      const layout = tabLayoutsRef.current[activeFilter];
+      const idx = FILTER_OPTIONS.findIndex((f) => f.key === activeFilter);
+      const padding = 12;
+      if (layout) {
+        const x = Math.max(0, layout.x - padding);
+        filterScrollRef.current.scrollTo({ x, animated: true });
+      } else if (idx >= 0) {
+        const x = Math.max(0, idx * 78 - padding);
+        filterScrollRef.current.scrollTo({ x, animated: true });
+      }
+    };
+    const task = InteractionManager.runAfterInteractions(() => {
+      scrollToActive();
+      timeoutId = setTimeout(scrollToActive, 120);
+    });
+    return () => {
+      task.cancel();
+      if (timeoutId) clearTimeout(timeoutId);
+    };
+  }, [activeFilter]);
 
   return (
     <View className="flex-1 bg-white">
@@ -356,6 +434,7 @@ export default function HomeScreen() {
         >
           {/* Filters at top of page */}
           <ScrollView
+            ref={filterScrollRef}
             horizontal
             showsHorizontalScrollIndicator={false}
             contentContainerStyle={{ paddingHorizontal: 12, paddingBottom: 8 }}
@@ -367,10 +446,14 @@ export default function HomeScreen() {
                 <TouchableOpacity
                   key={key}
                   onPress={() => setActiveFilter(key)}
-                  className={`rounded-lg px-2.5 py-1.5 mr-1.5 ${isActive ? 'bg-red-50 border-b-2 border-red-600' : 'bg-gray-100 border-b-0'}`}
+                  onLayout={(e) => {
+                    const { x, width } = e.nativeEvent.layout;
+                    tabLayoutsRef.current[key] = { x, width };
+                  }}
+                  className={`rounded-lg px-2.5 py-1.5 mr-1.5 ${isActive ? 'bg-primary/10 border-b-2 border-primary' : 'bg-gray-100 border-b-0'}`}
                 >
                   <Text
-                    className={`text-xs font-semibold ${isActive ? 'text-red-600' : 'text-gray-500'}`}
+                    className={`text-xs font-semibold ${isActive ? 'text-primary' : 'text-gray-500'}`}
                   >
                     {label}
                   </Text>
@@ -384,7 +467,11 @@ export default function HomeScreen() {
       {/* Content: paddingTop so list starts below fixed header */}
       <ScrollView
         className="flex-1"
-        contentContainerStyle={{ paddingTop: headerHeight, paddingBottom: bottomPadding }}
+        contentContainerStyle={{
+          paddingTop: headerHeight,
+          paddingBottom: bottomPadding,
+          flexGrow: 1,
+        }}
         showsVerticalScrollIndicator={false}
         overScrollMode="always"
         refreshControl={
@@ -396,17 +483,24 @@ export default function HomeScreen() {
           />
         }
       >
-        {/* Upcoming Events */}
-        <View className="px-3 pt-5">
-          <Text className="text-gray-900 text-xl font-bold mb-4">Upcoming Events</Text>
-          {loading ? (
-<View className="flex-row flex-wrap justify-between">
-            {[1, 2, 3, 4, 5, 6].map((i) => (
-              <EventCardSkeleton key={i} />
-            ))}
+        {/* Filter section: panHandlers here so ScrollView handles pull-to-refresh; horizontal swipes work on full page */}
+        <View key={activeFilter} className="flex-1 pt-5" style={{ minHeight: swipeAreaMinHeight }} {...filterPanResponder.panHandlers}>
+          {/* Primary heading for this filter - add more heading blocks here later */}
+          <View className="px-3">
+            <Text className="text-gray-900 text-xl font-bold mb-4">
+              {FILTER_HEADINGS[activeFilter]}
+            </Text>
           </View>
+          {loading ? (
+            <View className="grid grid-cols-2 flex-row flex-wrap px-[2px]" style={{ gap: 2 }}>
+              {[1, 2, 3, 4, 5, 6].map((i) => (
+                <View key={i} className="flex-[0_0_49%]">
+                  <EventCardSkeleton />
+                </View>
+              ))}
+            </View>
           ) : filteredEvents.length === 0 ? (
-            <View className="py-14 items-center justify-center">
+            <View className="px-[3px] py-14 items-center justify-center">
               <MaterialIcons name="event-busy" size={48} color="#4B5563" />
               <Text className="text-[#9CA3AF] text-base font-medium mt-3">No data found</Text>
               <Text className="text-[#6B7280] text-sm mt-1 text-center px-3">
@@ -419,7 +513,7 @@ export default function HomeScreen() {
               {activeFilter === 'myevents' && (
                 <TouchableOpacity
                   className="bg-primary py-4 px-8 rounded-xl mt-6"
-                  onPress={() => router.push('/create-event')}
+                  onPress={() => router.push('/create/create-event')}
                   activeOpacity={0.8}
                 >
                   <Text className="text-white text-base font-semibold">Create event</Text>
@@ -427,9 +521,11 @@ export default function HomeScreen() {
               )}
             </View>
           ) : (
-            <View className="flex-row flex-wrap justify-between">
+            <View className="grid grid-cols-2 flex-row flex-wrap px-[2px]" style={{ gap: 2 }}>
               {filteredEvents.map((event) => (
-                <EventCard key={event.id} event={event} />
+                <View key={event.id} className="flex-[0_0_49%]">
+                  <EventCard event={event} />
+                </View>
               ))}
             </View>
           )}

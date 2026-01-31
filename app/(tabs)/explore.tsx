@@ -71,11 +71,10 @@ export default function ExploreScreen() {
   const headerTranslateY = useRef(new Animated.Value(0)).current;
 
   // Calculate bottom padding: tab bar height + safe area bottom + extra padding
-  // Tab bar layout: iOS height=90 (includes paddingBottom=30), Android height=75 + paddingBottom + marginBottom=10
-  // Total space from bottom: iOS = 90 + insets.bottom, Android = 75 + max(insets.bottom, 50) + 10 + insets.bottom
-  const tabBarTotalHeight = Platform.OS === 'ios' 
-    ? 90 + insets.bottom // iOS: height includes padding, add safe area
-    : 75 + Math.max(insets.bottom, 50) + 10 + insets.bottom; // Android: height + paddingBottom + marginBottom + safe area
+  // Tab bar layout: compact bar with insets.bottom for devices with home indicator / gesture bar
+  const tabBarTotalHeight = Platform.OS === 'ios'
+    ? 56 + Math.max(insets.bottom, 6)
+    : 52 + Math.max(insets.bottom, 6) + 2;
   const bottomPadding = tabBarTotalHeight + 20; // Extra 20px for comfortable spacing
 
   useEffect(() => {
@@ -175,7 +174,7 @@ export default function ExploreScreen() {
           style={{ flex: 1 }}
           contentContainerStyle={{
             paddingTop: headerHeight,
-            paddingHorizontal: 12,
+            paddingHorizontal: 2,
             paddingBottom: bottomPadding,
           }}
           showsVerticalScrollIndicator={false}
@@ -188,9 +187,11 @@ export default function ExploreScreen() {
             />
           }
         >
-          <View className="flex-row flex-wrap justify-between">
+          <View className="flex-row flex-wrap" style={{ gap: 2 }}>
             {[1, 2, 3, 4, 5, 6].map((i) => (
-              <EventCardSkeleton key={i} />
+              <View key={i} className="flex-1 min-w-[48%]">
+                <EventCardSkeleton />
+              </View>
             ))}
           </View>
         </ScrollView>
@@ -200,15 +201,19 @@ export default function ExploreScreen() {
           style={{ flex: 1 }}
           contentContainerStyle={{
             paddingTop: headerHeight,
-            paddingHorizontal: 12,
+            paddingHorizontal: 2,
             paddingBottom: bottomPadding,
           }}
           onScroll={handleScroll}
           scrollEventThrottle={16}
-          renderItem={({ item }) => <EventCard event={item} />}
+          renderItem={({ item }) => (
+            <View className="flex-1">
+              <EventCard event={item} />
+            </View>
+          )}
           keyExtractor={(item) => item.id}
           numColumns={2}
-          columnWrapperStyle={{ justifyContent: 'space-between', marginBottom: 8 }}
+          columnWrapperStyle={{ gap: 2, marginBottom: 2 }}
           refreshControl={
             <RefreshControl
               refreshing={refreshing}

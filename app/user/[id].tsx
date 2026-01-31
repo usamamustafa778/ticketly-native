@@ -16,6 +16,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { authAPI, type PublicUserProfile } from '@/lib/api/auth';
 import { getProfileImageUrl, getEventImageUrl } from '@/lib/utils/imageUtils';
+import { BackButton } from '@/components/BackButton';
 import { EventCard } from '@/components/EventCard';
 
 type TabKey = 'created' | 'joined' | 'liked';
@@ -70,7 +71,7 @@ export default function UserProfileScreen() {
   const [activeTab, setActiveTab] = useState<TabKey>('created');
   const [showImageViewer, setShowImageViewer] = useState(false);
 
-  const tabBarTotalHeight = Platform.OS === 'ios' ? 90 + insets.bottom : 75 + Math.max(insets.bottom, 50) + 10 + insets.bottom;
+  const tabBarTotalHeight = Platform.OS === 'ios' ? 56 + Math.max(insets.bottom, 6) : 52 + Math.max(insets.bottom, 6) + 2;
   const bottomPadding = tabBarTotalHeight + 20;
 
   const fetchProfile = useCallback(
@@ -111,7 +112,7 @@ export default function UserProfileScreen() {
   const createdEvents = (profile?.createdEvents || []).map(convertEvent);
   const joinedEvents = (profile?.joinedEvents || [])
     .map((item: any) => (item?.event ? convertEvent(item.event) : null))
-    .filter(Boolean);
+    .filter((e): e is NonNullable<typeof e> => e != null);
   const likedEvents = (profile?.likedEvents || []).map(convertEvent);
   const showLikedTab = (profile?.likedEventsVisibility ?? 'public') === 'public';
 
@@ -165,12 +166,7 @@ export default function UserProfileScreen() {
       >
         {/* Header - Back button */}
         <View className="flex-row justify-end items-center px-3 pt-5 pb-2">
-          <TouchableOpacity
-            className="bg-gray-100 w-10 h-10 rounded-lg items-center justify-center"
-            onPress={() => router.back()}
-          >
-            <MaterialIcons name="arrow-back" size={24} color="#111827" />
-          </TouchableOpacity>
+          <BackButton onPress={() => router.back()} />
         </View>
 
         {/* Profile Section - Centered (similar to profile page) */}
@@ -258,22 +254,23 @@ export default function UserProfileScreen() {
         </View>
 
         {/* Events List */}
-        <View className="px-3 mb-8">
+        <View className="mb-8">
           {currentEvents.length === 0 ? (
-            <View className="py-10 items-center">
+            <View className="px-3 py-10 items-center">
               <MaterialIcons name="event-busy" size={48} color="#4B5563" />
               <Text className="text-[#9CA3AF] text-base mt-3">
                 No {activeTab} events yet
               </Text>
             </View>
           ) : (
-            <View className="flex-row flex-wrap justify-between">
+            <View className="grid grid-cols-2 flex-row flex-wrap px-[2px]" style={{ gap: 2 }}>
               {currentEvents.map((event) => (
-                <EventCard
-                  key={event.id}
-                  event={event}
-                  onPress={() => router.push(`/event-details/${event.id}`)}
-                />
+                <View key={event.id} className="flex-[0_0_49%]">
+                  <EventCard
+                    event={event}
+                    onPress={() => router.push(`/event-details/${event.id}`)}
+                  />
+                </View>
               ))}
             </View>
           )}

@@ -78,7 +78,7 @@ const getApiBaseUrl = (): string => {
 // Or hardcode production URL for all devices:
 export const API_BASE_URL = "https://ticketly-backend-oem4.onrender.com/api";
 // export const API_BASE_URL = "http://localhost:5001/api";
-
+// 
 
 // Log the API URL being used (for debugging)
 if (__DEV__) {

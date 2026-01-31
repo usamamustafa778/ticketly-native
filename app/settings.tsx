@@ -11,6 +11,7 @@ import {
   RefreshControl,
 } from 'react-native';
 import { useRouter } from 'expo-router';
+import { BackButton } from '@/components/BackButton';
 import { Modal } from '@/components/Modal';
 import { useAppStore } from '@/store/useAppStore';
 import { authAPI } from '@/lib/api/auth';
@@ -246,9 +247,7 @@ export default function SettingsScreen() {
       >
         {/* Header */}
         <View className="flex-row items-center pt-[60px] px-3 pb-4 border-b border-gray-200">
-          <TouchableOpacity onPress={() => router.back()} className="p-2 -ml-2" activeOpacity={0.7}>
-            <MaterialIcons name="arrow-back" size={24} color="#111827" />
-          </TouchableOpacity>
+          <BackButton onPress={() => router.back()} className="-ml-2" />
           <Text className="flex-1 text-gray-900 text-lg font-semibold text-center mr-8">Settings</Text>
         </View>
 

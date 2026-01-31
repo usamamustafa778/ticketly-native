@@ -14,6 +14,7 @@ import { useAppStore } from '@/store/useAppStore';
 import { ticketsAPI, type Ticket } from '@/lib/api/tickets';
 import { paymentsAPI } from '@/lib/api/payments';
 import * as ImagePicker from 'expo-image-picker';
+import { BackButton } from '@/components/BackButton';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { API_BASE_URL } from '@/lib/config';
 import { getEventImageUrl } from '@/lib/utils/imageUtils';
@@ -382,18 +383,16 @@ export default function TicketScreen() {
     >
       {/* Header */}
       <View className="flex-row items-center justify-between pt-[60px] px-3 pb-5 bg-white">
-        <TouchableOpacity onPress={() => router.back()}>
-          <MaterialIcons name="arrow-back" size={24} color="#111827" />
-        </TouchableOpacity>
+        <BackButton onPress={() => router.back()} />
         <Text className="text-gray-900 text-xl font-bold">Your Ticket</Text>
         <View className="w-[30px]" />
       </View>
 
       {/* Ticket Card - Paper Style */}
-      <View className="mx-3 mb-6">
-        <View className="bg-white rounded-xl overflow-hidden relative shadow-lg" style={{ elevation: 8 }}>
+      <View className="mx-[30px] mb-6">
+        <View className="bg-white rounded-xl relative border  border-gray-200" style={{ elevation: 8 }}>
           {/* Perforated left edge */}
-          <View className="absolute left-0 top-0 bottom-0 w-3 border-l-2 border-primary border-dashed" />
+          <View className="absolute left-0 top-0 bottom-0 w-3" />
           <View className="px-3 py-5">
             {/* Header: Logo, Title, Tagline */}
             <View className="items-center mb-3">
@@ -406,13 +405,23 @@ export default function TicketScreen() {
                 {(ticket.event?.description?.length || 0) > 50 ? '...' : ''}
               </Text>
             </View>
-            <View className="h-px bg-primary/40 my-3.5" />
+            <View className="h-px border-t-2 border-primary border-dashed my-3.5 relative w-full " >
+            </View>
 
             {/* Event Details - Bulleted */}
             <View className="gap-1.5">
-              {ticket.event?.location && (
-                <Text className="text-sm text-gray-900 leading-[22px]">• Location: {ticket.event.location}</Text>
-              )}
+            <Text className="text-[13px] text-gray-800 mb-0.5">USER: {ticket.username}</Text>
+            <Text className="text-[13px] text-gray-800 mb-0.5">EMAIL: {ticket.email}</Text>
+             
+              
+            </View>
+            <View className=""> {ticket.event?.location && (
+                <Text className="text-sm text-gray-900 leading-[22px]">LOCATION: {ticket.event.location}</Text>
+              )}</View>
+
+            {/* Status + User Info + QR Row */}
+            <View className="flex-row justify-between items-start mt-2 h-[90px]">
+              <View className="h-full flex flex-col justify-center">
               {ticket.event?.date && (
                 <Text className="text-sm text-gray-900 leading-[22px]">• Date: {formatDateShort(ticket.event.date)}</Text>
               )}
@@ -422,24 +431,19 @@ export default function TicketScreen() {
               {ticket.event?.ticketPrice !== undefined && (
                 <Text className="text-sm text-gray-900 leading-[22px]">• Price: {ticket.event.ticketPrice.toLocaleString()} PKR</Text>
               )}
-            </View>
-            <View className="h-px bg-primary/40 my-3.5" />
-
-            {/* Status + User Info + QR Row */}
-            <View className="flex-row justify-between items-start mt-2">
+              </View>
               <View className="flex-1 relative">
-                <Text className="text-[13px] text-gray-800 mb-0.5">USER: {ticket.username}</Text>
-                <Text className="text-[13px] text-gray-800 mb-0.5">EMAIL: {ticket.email}</Text>
+                
                 {/* Status Stamp - overlaps user info */}
                 <View
-                  className="absolute -top-10 right-2 border-2 border-dashed py-2 px-3 rotate-[8deg]"
+                  className="absolute -top-3 right-2 border-[1px] border-dashed py-2 px-3 rotate-[-8deg] whitespace-nowrap"
                   style={{
                     borderColor: getStatusColor(ticket.status),
                     backgroundColor: getStatusBgColor(ticket.status),
                   }}
                 >
                   <Text
-                    className="text-xs font-bold tracking-wide"
+                    className="text-xs font-bold tracking-wide whitespace-nowrap w-full max-h-[18px]"
                     style={{ color: getStatusColor(ticket.status) 
                     }}
                   >
@@ -452,7 +456,7 @@ export default function TicketScreen() {
                   <View className="bg-white p-2 rounded-lg border border-primary">
                     <QRCode
                       value={ticket.accessKey}
-                      size={100}
+                      size={70}
                       color="#1F1F1F"
                       backgroundColor="#FFFFFF"
                     />
@@ -460,6 +464,7 @@ export default function TicketScreen() {
                 </View>
               )}
             </View>
+            <View className="h-px border-t-2 border-primary border-dashed my-3.5" />
 
             {/* Timestamp & Access Key */}
             {ticket.createdAt && (

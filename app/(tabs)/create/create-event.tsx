@@ -1,3 +1,4 @@
+import { BackButton } from '@/components/BackButton';
 import { Modal } from '@/components/Modal';
 import { authAPI } from '@/lib/api/auth';
 import { eventsAPI, type EventPrice } from '@/lib/api/events';
@@ -5,11 +6,13 @@ import { useAppStore } from '@/store/useAppStore';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import * as ImagePicker from 'expo-image-picker';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useRouter } from 'expo-router';
-import React, { useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Image,
+  Keyboard,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -30,7 +33,8 @@ interface EventFormData {
   genderSelection: string;
   description: string;
   imageUri: string | null;
-  imageUrl: string | null;
+  imageUrl: string | null; // for preview display
+  imagePath: string | null; // relative path for API (e.g. /uploads/events/xxx.jpg)
   // Step 2 - Payment and Ticket
   eventType: 'paid' | 'free';
   ticketPrice: string;
@@ -59,6 +63,56 @@ function formatDateForDisplay(date: Date): string {
   return date.toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' });
 }
 
+function toImagePath(urlOrPath: string): string | null {
+  if (!urlOrPath) return null;
+  if (urlOrPath.startsWith('/')) return urlOrPath; // Already a path
+  try {
+    return new URL(urlOrPath).pathname || null;
+  } catch {
+    const i = urlOrPath.indexOf('/uploads');
+    return i !== -1 ? urlOrPath.substring(i) : urlOrPath;
+  }
+}
+
+export const CREATE_EVENT_DRAFT_KEY = 'ticketly_create_event_draft';
+
+type DraftData = Omit<EventFormData, 'eventDate'> & { eventDate: string | null; step: 1 | 2 };
+
+function serializeDraft(formData: EventFormData, step: 1 | 2): DraftData {
+  return {
+    ...formData,
+    eventDate: formData.eventDate ? formData.eventDate.toISOString() : null,
+    step,
+  };
+}
+
+function deserializeDraft(raw: DraftData): { formData: EventFormData; step: 1 | 2 } | null {
+  if (!raw || typeof raw !== 'object') return null;
+  const eventDate = raw.eventDate ? (() => {
+    const d = new Date(raw.eventDate);
+    return isNaN(d.getTime()) ? null : d;
+  })() : null;
+  const step = raw.step === 1 || raw.step === 2 ? raw.step : 1;
+  return {
+    formData: {
+      eventName: String(raw.eventName ?? ''),
+      eventDate,
+      eventTime: String(raw.eventTime ?? '18:00'),
+      address: String(raw.address ?? ''),
+      genderSelection: String(raw.genderSelection ?? 'All'),
+      description: String(raw.description ?? ''),
+      imageUri: raw.imageUri ?? null,
+      imageUrl: raw.imageUrl ?? null,
+      imagePath: raw.imagePath ?? null,
+      eventType: raw.eventType === 'paid' ? 'paid' : 'free',
+      ticketPrice: String(raw.ticketPrice ?? ''),
+      totalTickets: String(raw.totalTickets ?? '100'),
+      currency: String(raw.currency ?? 'PKR'),
+    },
+    step,
+  };
+}
+
 export default function CreateEventScreen() {
   const router = useRouter();
   const user = useAppStore((state) => state.user);
@@ -78,6 +132,23 @@ export default function CreateEventScreen() {
   const [createdEventId, setCreatedEventId] = useState<string | null>(null);
   /** Per-field validation errors (shown when user taps Next or Submit with invalid data) */
   const [errors, setErrors] = useState<Partial<Record<keyof EventFormData, string>>>({});
+  const [keyboardHeight, setKeyboardHeight] = useState(0);
+
+  useEffect(() => {
+    const showSub = Keyboard.addListener(
+      Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow',
+      (e) => setKeyboardHeight(e.endCoordinates.height)
+    );
+    const hideSub = Keyboard.addListener(
+      Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide',
+      () => setKeyboardHeight(0)
+    );
+    return () => {
+      showSub.remove();
+      hideSub.remove();
+    };
+  }, []);
+
   const [formData, setFormData] = useState<EventFormData>({
     eventName: '',
     eventDate: null,
@@ -87,11 +158,59 @@ export default function CreateEventScreen() {
     description: '',
     imageUri: null,
     imageUrl: null,
+    imagePath: null,
     eventType: 'free',
     ticketPrice: '',
     totalTickets: '100',
     currency: 'PKR',
   });
+
+  const stepRef = useRef(step);
+  stepRef.current = step;
+
+  const draftLoadedRef = useRef(false);
+
+  // Load draft from AsyncStorage on mount
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const raw = await AsyncStorage.getItem(CREATE_EVENT_DRAFT_KEY);
+        if (cancelled || !raw) {
+          draftLoadedRef.current = true;
+          return;
+        }
+        const parsed = JSON.parse(raw) as DraftData;
+        const restored = deserializeDraft(parsed);
+        if (!cancelled && restored) {
+          setFormData(restored.formData);
+          setStep(restored.step);
+        }
+      } catch (_) {}
+      finally {
+        if (!cancelled) draftLoadedRef.current = true;
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []);
+
+  // Debounced save draft when formData or step changes (only after initial load)
+  const saveDraft = useCallback((data: EventFormData, s: 1 | 2) => {
+    const payload = serializeDraft(data, s);
+    AsyncStorage.setItem(CREATE_EVENT_DRAFT_KEY, JSON.stringify(payload)).catch(() => {});
+  }, []);
+  const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => {
+    if (!draftLoadedRef.current) return;
+    if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
+    saveTimeoutRef.current = setTimeout(() => {
+      saveTimeoutRef.current = null;
+      saveDraft(formData, stepRef.current);
+    }, 400);
+    return () => {
+      if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
+    };
+  }, [formData, step, saveDraft]);
 
   const handleInputChange = (field: keyof EventFormData, value: string | Date | null) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
@@ -122,12 +241,18 @@ export default function CreateEventScreen() {
     try {
       const response = await eventsAPI.uploadEventImage(imageUri);
       if (response.success) {
-        setFormData((prev) => ({ ...prev, imageUrl: response.imageUrl }));
+        // Extract path from imageUrl for API, use imageUrl for preview
+        const path = response.imageUrl ? toImagePath(response.imageUrl) : null;
+        setFormData((prev) => ({
+          ...prev,
+          imagePath: path,
+          imageUrl: response.imageUrl || null,
+        }));
       } else {
-        setFormData((prev) => ({ ...prev, imageUri: null, imageUrl: null }));
+        setFormData((prev) => ({ ...prev, imageUri: null, imageUrl: null, imagePath: null }));
       }
     } catch {
-      setFormData((prev) => ({ ...prev, imageUri: null, imageUrl: null }));
+      setFormData((prev) => ({ ...prev, imageUri: null, imageUrl: null, imagePath: null }));
     } finally {
       setUploadingImage(false);
     }
@@ -186,18 +311,29 @@ export default function CreateEventScreen() {
 
     setLoading(true);
     try {
-      let imageUrl = formData.imageUrl;
-      if (formData.imageUri && !formData.imageUrl) {
+      // Use relative path for API (dynamic backend URL)
+      let imageToSend: string | undefined = formData.imagePath || undefined;
+      if (formData.imageUri && !formData.imagePath) {
         setUploadingImage(true);
         try {
           const uploadResponse = await eventsAPI.uploadEventImage(formData.imageUri);
-          if (uploadResponse.success) imageUrl = uploadResponse.imageUrl;
-          else imageUrl = '';
+          if (uploadResponse.success) {
+            const path = uploadResponse.imageUrl ? toImagePath(uploadResponse.imageUrl) : null;
+            imageToSend = path || undefined;
+            setFormData((prev) => ({
+              ...prev,
+              imagePath: path,
+              imageUrl: uploadResponse.imageUrl || null,
+            }));
+          } else {
+            imageToSend = '';
+          }
         } catch {
-          imageUrl = '';
+          imageToSend = '';
         } finally {
           setUploadingImage(false);
         }
+        
       }
 
       const eventDate = formData.eventDate!;
@@ -218,7 +354,7 @@ export default function CreateEventScreen() {
         time: timeStr,
         location: formData.address.trim() || undefined,
         description: formData.description.trim() || undefined,
-        image: imageUrl || undefined,
+        image: imageToSend,
         email: user?.email || '',
         organizerName: user?.fullName || undefined,
         phone: user?.phone || undefined,
@@ -229,6 +365,7 @@ export default function CreateEventScreen() {
       });
 
       if (response.success) {
+        await AsyncStorage.removeItem(CREATE_EVENT_DRAFT_KEY);
         const eventId = response.event?.id || (response.event as any)?._id;
         if (eventId) setCreatedEventId(String(eventId));
         try {
@@ -262,9 +399,9 @@ export default function CreateEventScreen() {
     return x;
   })();
 
-  const inputRow = 'bg-gray-50 rounded-2xl py-3 px-4 flex-row items-center gap-3 border border-gray-200';
-  const iconWrap = 'w-10 h-10 rounded-full bg-gray-200 items-center justify-center';
-  const labelClass = 'text-gray-900 text-sm font-medium mb-2';
+  const inputRow = 'bg-gray-50 rounded-md py-2 px-3 flex-row items-center gap-2 border border-gray-200';
+  const iconWrap = 'w-8 h-8 rounded-full bg-gray-200 items-center justify-center';
+  const labelClass = 'text-gray-900 text-sm font-medium mb-1.5';
 
   return (
     <KeyboardAvoidingView
@@ -274,9 +411,7 @@ export default function CreateEventScreen() {
       {/* Header: back, progress bar, step label */}
       <View className="pt-[52px] px-4 pb-4 border-b border-gray-200">
         <View className="flex-row items-center justify-between mb-4">
-          <TouchableOpacity onPress={() => (step === 1 ? router.back() : setStep(1))} className="p-2 -ml-2">
-            <MaterialIcons name="arrow-back" size={24} color="#111827" />
-          </TouchableOpacity>
+          <BackButton onPress={() => (step === 1 ? router.back() : setStep(1))} className="-ml-2" />
           <View className="flex-1 flex-row items-center justify-center gap-2">
             <View className="flex-1 h-1.5 rounded-full bg-gray-200 overflow-hidden">
               <View
@@ -296,7 +431,11 @@ export default function CreateEventScreen() {
 
       <ScrollView
         className="flex-1"
-        contentContainerStyle={{ paddingBottom: 40, paddingHorizontal: 16, paddingTop: 24 }}
+        contentContainerStyle={{
+          paddingBottom: 40 + keyboardHeight,
+          paddingHorizontal: 16,
+          paddingTop: 24,
+        }}
         showsVerticalScrollIndicator={false}
       >
         {step === 1 && (
@@ -347,7 +486,7 @@ export default function CreateEventScreen() {
 
             <Text className={labelClass}>Event Name</Text>
             <TextInput
-              className={`${inputRow} mb-1 ${errors.eventName ? 'border-[#EF4444]' : ''}`}
+              className={`${inputRow} mb-1 text-sm ${errors.eventName ? 'border-[#EF4444]' : ''}`}
               placeholder="name"
               placeholderTextColor="#6B7280"
               value={formData.eventName}
@@ -356,7 +495,7 @@ export default function CreateEventScreen() {
             />
             {errors.eventName ? <Text className="text-[#EF4444] text-xs mb-3">{errors.eventName}</Text> : null}
 
-            <View className="flex-row gap-3 mb-4">
+            <View className="flex-row gap-2 mb-3">
               <View className="flex-1">
                 <Text className={labelClass}>Start Date</Text>
                 <TouchableOpacity
@@ -364,9 +503,9 @@ export default function CreateEventScreen() {
                   onPress={() => setShowDatePicker(true)}
                 >
                   <View className={iconWrap}>
-                    <MaterialIcons name="event" size={20} color="#9CA3AF" />
+                    <MaterialIcons name="event" size={18} color="#9CA3AF" />
                   </View>
-                  <Text className={formData.eventDate ? 'text-white' : 'text-[#6B7280]'}>
+                  <Text className={`text-sm ${formData.eventDate ? 'text-gray-900' : 'text-[#6B7280]'}`}>
                     {formData.eventDate ? formatDateForDisplay(formData.eventDate) : 'Select date'}
                   </Text>
                 </TouchableOpacity>
@@ -379,9 +518,9 @@ export default function CreateEventScreen() {
                   onPress={() => setShowTimePicker(true)}
                 >
                   <View className={iconWrap}>
-                    <MaterialIcons name="schedule" size={20} color="#9CA3AF" />
+                    <MaterialIcons name="schedule" size={18} color="#9CA3AF" />
                   </View>
-                  <Text className="text-white">{formData.eventTime}</Text>
+                  <Text className="text-gray-900 text-sm">{formData.eventTime}</Text>
                 </TouchableOpacity>
                 {errors.eventTime ? <Text className="text-[#EF4444] text-xs mt-1">{errors.eventTime}</Text> : null}
               </View>
@@ -439,12 +578,12 @@ export default function CreateEventScreen() {
             )}
 
             <Text className={labelClass}>Address <Text className="text-[#6B7280]">(optional)</Text></Text>
-            <View className={`${inputRow} mb-4`}>
+            <View className={`${inputRow} mb-3`}>
               <View className={iconWrap}>
-                <MaterialIcons name="location-on" size={20} color="#9CA3AF" />
+                <MaterialIcons name="location-on" size={18} color="#9CA3AF" />
               </View>
               <TextInput
-                className="flex-1 text-gray-900 text-base"
+                className="flex-1 text-gray-900 text-sm"
                 placeholder="e.g. Islamabad, Pakistan"
                 placeholderTextColor="#6B7280"
                 value={formData.address}
@@ -458,9 +597,9 @@ export default function CreateEventScreen() {
               onPress={() => setShowGenderModal(true)}
             >
               <View className={iconWrap}>
-                <MaterialIcons name="person-outline" size={20} color="#9CA3AF" />
+                <MaterialIcons name="person-outline" size={18} color="#9CA3AF" />
               </View>
-              <Text className="text-gray-900">{formData.genderSelection}</Text>
+              <Text className="text-gray-900 text-sm">{formData.genderSelection}</Text>
               <MaterialIcons name="expand-more" size={20} color="#9CA3AF" />
             </TouchableOpacity>
             {errors.genderSelection ? <Text className="text-[#EF4444] text-xs mb-3">{errors.genderSelection}</Text> : null}
@@ -497,7 +636,7 @@ export default function CreateEventScreen() {
                         activeOpacity={0.8}
                       >
                         <View className="w-10 h-10 rounded-full bg-gray-200 items-center justify-center mr-3">
-                          <MaterialIcons name="person-outline" size={20} color="#9CA3AF" />
+                          <MaterialIcons name="person-outline" size={18} color="#9CA3AF" />
                         </View>
                         <Text className="text-gray-900 text-base font-medium flex-1">{opt}</Text>
                         {isSelected && (
@@ -514,7 +653,7 @@ export default function CreateEventScreen() {
 
             <Text className={labelClass}>Description <Text className="text-[#6B7280]">(optional)</Text></Text>
             <TextInput
-              className="bg-gray-50 border border-gray-200 rounded-2xl py-3.5 px-4 text-gray-900 text-base min-h-[100px] mb-6"
+              className="bg-gray-50 border border-gray-200 rounded-md py-2 px-3 text-gray-900 text-sm min-h-[72px] mb-6"
               placeholder="description"
               placeholderTextColor="#6B7280"
               value={formData.description}
@@ -526,7 +665,7 @@ export default function CreateEventScreen() {
             <TouchableOpacity
               onPress={handleNext}
               disabled={!step1Valid}
-              className={`w-full py-4 rounded-2xl overflow-hidden ${!step1Valid ? 'opacity-50' : ''}`}
+              className={`w-full py-2.5 rounded-md overflow-hidden ${!step1Valid ? 'opacity-50' : ''}`}
               style={{
                 backgroundColor: '#DC2626',
                 shadowColor: '#DC2626',
@@ -544,10 +683,10 @@ export default function CreateEventScreen() {
         {step === 2 && (
           <>
             <Text className={labelClass}>Event Type</Text>
-            <View className="flex-row gap-3 mb-6">
+            <View className="flex-row gap-2 mb-4">
               <TouchableOpacity
                 onPress={() => handleInputChange('eventType', 'paid')}
-                className={`flex-1 py-4 px-4 rounded-2xl border-2 flex-row items-center justify-center gap-2 ${
+                className={`flex-1 py-2.5 px-3 rounded-md border-2 flex-row items-center justify-center gap-2 ${
                   formData.eventType === 'paid' ? 'border-primary bg-primary/10' : 'border-gray-200 bg-gray-50'
                 }`}
               >
@@ -562,7 +701,7 @@ export default function CreateEventScreen() {
               </TouchableOpacity>
               <TouchableOpacity
                 onPress={() => handleInputChange('eventType', 'free')}
-                className={`flex-1 py-4 px-4 rounded-2xl border-2 flex-row items-center justify-center gap-2 ${
+                className={`flex-1 py-2.5 px-3 rounded-md border-2 flex-row items-center justify-center gap-2 ${
                   formData.eventType === 'free' ? 'border-primary bg-primary/10' : 'border-gray-200 bg-gray-50'
                 }`}
               >
@@ -580,12 +719,12 @@ export default function CreateEventScreen() {
             {formData.eventType === 'paid' && (
               <>
                 <Text className={labelClass}>Cost Per Ticket</Text>
-                <View className="flex-row items-center gap-3 mb-1">
-                  <View className="w-10 h-10 rounded-full bg-[#374151] items-center justify-center">
-                    <MaterialIcons name="account-balance-wallet" size={20} color="#9CA3AF" />
+                <View className="flex-row items-center gap-2 mb-1">
+                  <View className="w-8 h-8 rounded-full bg-[#374151] items-center justify-center">
+                    <MaterialIcons name="account-balance-wallet" size={18} color="#9CA3AF" />
                   </View>
                   <TextInput
-                    className={`flex-1 bg-[#1F1F1F] border rounded-2xl py-3.5 px-4 text-white text-base ${errors.ticketPrice ? 'border-[#EF4444]' : 'border-[#374151]'}`}
+                    className={`flex-1 bg-[#1F1F1F] border rounded-md py-2 px-3 text-white text-sm ${errors.ticketPrice ? 'border-[#EF4444]' : 'border-[#374151]'}`}
                     placeholder="e.g. 600"
                     placeholderTextColor="#6B7280"
                     value={formData.ticketPrice}
@@ -596,12 +735,12 @@ export default function CreateEventScreen() {
                 {errors.ticketPrice ? <Text className="text-[#EF4444] text-xs mb-3">{errors.ticketPrice}</Text> : null}
                 <Text className={labelClass}>Select Currency</Text>
                 <TouchableOpacity
-                  className="flex-row items-center gap-3 bg-[#1F1F1F] border border-[#374151] rounded-2xl py-3 px-4 mb-4"
+                  className="flex-row items-center gap-2 bg-[#1F1F1F] border border-[#374151] rounded-md py-2 px-3 mb-4"
                   onPress={() => setShowCurrencyModal(true)}
                   activeOpacity={0.8}
                 >
-                  <View className="w-10 h-10 rounded-full bg-[#374151] items-center justify-center">
-                    <Text className="text-xl">{CURRENCY_OPTIONS.find((c) => c.code === formData.currency)?.flag ?? '🇵🇰'}</Text>
+                  <View className="w-8 h-8 rounded-full bg-[#374151] items-center justify-center">
+                    <Text className="text-lg">{CURRENCY_OPTIONS.find((c) => c.code === formData.currency)?.flag ?? '🇵🇰'}</Text>
                   </View>
                   <Text className="text-white text-base flex-1">{formData.currency}</Text>
                   <MaterialIcons name="expand-more" size={20} color="#9CA3AF" />
@@ -659,7 +798,7 @@ export default function CreateEventScreen() {
 
                 <Text className={labelClass}>Total Tickets</Text>
                 <TextInput
-                  className={`bg-gray-50 border rounded-2xl py-3.5 px-4 text-gray-900 text-base mb-1 ${errors.totalTickets ? 'border-[#EF4444]' : 'border-gray-200'}`}
+                  className={`bg-gray-50 border rounded-md py-2 px-3 text-gray-900 text-sm mb-1 ${errors.totalTickets ? 'border-[#EF4444]' : 'border-gray-200'}`}
                   placeholder="e.g. 100"
                   placeholderTextColor="#6B7280"
                   value={formData.totalTickets}
@@ -673,7 +812,7 @@ export default function CreateEventScreen() {
             <TouchableOpacity
               onPress={handleSubmit}
               disabled={loading || !step2Valid}
-              className={`w-full py-4 rounded-2xl bg-primary items-center justify-center mt-2 ${loading || !step2Valid ? 'opacity-60' : ''}`}
+              className={`w-full py-2.5 rounded-md bg-primary items-center justify-center mt-2 ${loading || !step2Valid ? 'opacity-60' : ''}`}
             >
               {loading ? (
                 <ActivityIndicator color="#FFF" />

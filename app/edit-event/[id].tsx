@@ -6,166 +6,197 @@ import {
   TouchableOpacity,
   ScrollView,
   KeyboardAvoidingView,
+  Keyboard,
   Platform,
-  Alert,
   Image,
   ActivityIndicator,
+  Pressable,
+  Modal as RNModal,
 } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useAppStore } from '@/store/useAppStore';
+import { authAPI } from '@/lib/api/auth';
 import { eventsAPI, type Event } from '@/lib/api/events';
 import { Modal } from '@/components/Modal';
+import { BackButton } from '@/components/BackButton';
+import { EventDetailsSkeleton } from '@/components/EventDetailsSkeleton';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import * as ImagePicker from 'expo-image-picker';
 import { getEventImageUrl } from '@/lib/utils/imageUtils';
 
 interface EventFormData {
-  name: string;
-  email: string;
-  phone: string;
-  companyName: string;
   eventName: string;
-  eventLocation: string;
   eventDate: Date | null;
   eventTime: string;
-  eventCity: string;
-  ticketPrice: string;
-  totalTickets: string;
-  eventCategory: string;
+  address: string;
+  genderSelection: string;
   description: string;
   imageUri: string | null;
   imageUrl: string | null;
+  imagePath: string | null;
+  eventType: 'paid' | 'free';
+  ticketPrice: string;
+  totalTickets: string;
+  currency: string;
+}
+
+const GENDER_OPTIONS = ['All', 'Male', 'Female'] as const;
+const CURRENCY_OPTIONS = [{ code: 'PKR', label: 'Pakistani Rupee (PKR)', flag: '🇵🇰' }] as const;
+
+function genderToApi(v: string): 'all' | 'male' | 'female' {
+  const lower = v.toLowerCase();
+  if (lower === 'male' || lower === 'female' || lower === 'all') return lower;
+  return 'all';
+}
+
+function formatTime(date: Date): string {
+  return date.toTimeString().slice(0, 5);
+}
+
+function formatDateForDisplay(date: Date): string {
+  return date.toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' });
+}
+
+function toImagePath(urlOrPath: string): string | null {
+  if (!urlOrPath) return null;
+  if (urlOrPath.startsWith('/')) return urlOrPath;
+  try {
+    return new URL(urlOrPath).pathname || null;
+  } catch {
+    const i = urlOrPath.indexOf('/uploads');
+    return i !== -1 ? urlOrPath.substring(i) : urlOrPath;
+  }
 }
 
 export default function EditEventScreen() {
   const router = useRouter();
   const { id } = useLocalSearchParams<{ id: string }>();
   const user = useAppStore((state) => state.user);
+  const setUser = useAppStore((state) => state.setUser);
+  const [step, setStep] = useState<1 | 2>(1);
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [showTimePicker, setShowTimePicker] = useState(false);
+  const [showGenderModal, setShowGenderModal] = useState(false);
+  const [showCurrencyModal, setShowCurrencyModal] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [uploadingImage, setUploadingImage] = useState(false);
+  const [keyboardHeight, setKeyboardHeight] = useState(0);
   const [event, setEvent] = useState<Event | null>(null);
+  const [showErrorModal, setShowErrorModal] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
+  const [errors, setErrors] = useState<Partial<Record<keyof EventFormData, string>>>({});
+
   const [formData, setFormData] = useState<EventFormData>({
-    name: user?.fullName || '',
-    email: user?.email || '',
-    phone: user?.phone || '',
-    companyName: user?.companyName || '',
     eventName: '',
-    eventLocation: '',
     eventDate: null,
     eventTime: '18:00',
-    eventCity: '',
-    ticketPrice: '',
-    totalTickets: '',
-    eventCategory: '',
+    address: '',
+    genderSelection: 'All',
     description: '',
     imageUri: null,
     imageUrl: null,
+    imagePath: null,
+    eventType: 'free',
+    ticketPrice: '',
+    totalTickets: '100',
+    currency: 'PKR',
   });
 
-  const categories = ['Music', 'Technology', 'Festival', 'Sports', 'Arts', 'Business', 'Other'];
+  const eventId = Array.isArray(id) ? id[0] : id;
 
-  // Get event ID helper
-  const getEventId = () => {
-    return Array.isArray(id) ? id[0] : id;
-  };
+  useEffect(() => {
+    const showSub = Keyboard.addListener(
+      Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow',
+      (e) => setKeyboardHeight(e.endCoordinates.height)
+    );
+    const hideSub = Keyboard.addListener(
+      Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide',
+      () => setKeyboardHeight(0)
+    );
+    return () => {
+      showSub.remove();
+      hideSub.remove();
+    };
+  }, []);
 
-  // Load event data
   useEffect(() => {
     const loadEvent = async () => {
-      const eventId = getEventId();
       if (!eventId) {
-        Alert.alert('Error', 'Event ID is required', [
-          { text: 'OK', onPress: () => router.back() },
-        ]);
+        setErrorMessage('Event ID is required');
+        setLoading(false);
         return;
       }
-
       try {
         setLoading(true);
         const response = await eventsAPI.getEventById(String(eventId));
-        
         if (response.success && response.event) {
-          const eventData = response.event;
-          setEvent(eventData);
-
-          // Parse location to extract location and city
-          const locationParts = eventData.location?.split(',') || [];
-          const eventLocation = locationParts[0]?.trim() || '';
-          const eventCity = locationParts.slice(1).join(',').trim() || '';
-
-          // Parse date
-          const eventDate = eventData.date ? new Date(eventData.date) : null;
-
-          // Get image URL
-          const imageUrl = getEventImageUrl(eventData);
-
-          // Pre-fill form with event data
+          const e = response.event;
+          setEvent(e);
+          const price = e.price?.price;
+          const isFree = price === 'free' || price === null || price === undefined;
+          const ticketPriceNum = typeof price === 'number' ? price : e.ticketPrice ?? 0;
+          const genderCap = e.gender ? e.gender.charAt(0).toUpperCase() + e.gender.slice(1) : 'All';
+          const dateStr = e.date;
+          const eventDate = dateStr ? new Date(dateStr) : null;
+          const displayImageUrl = getEventImageUrl(e);
+          const imagePath = e.imageUrl
+            ? (e.imageUrl.startsWith('/') ? e.imageUrl : (() => {
+                try { return new URL(e.imageUrl!).pathname; } catch {
+                  const i = e.imageUrl!.indexOf('/uploads');
+                  return i !== -1 ? e.imageUrl!.substring(i) : e.imageUrl!;
+                }
+              })())
+            : e.image || null;
           setFormData({
-            name: user?.fullName || '',
-            email: eventData.email || user?.email || '',
-            phone: eventData.phone || user?.phone || '',
-            companyName: user?.companyName || '',
-            eventName: eventData.title || '',
-            eventLocation,
+            eventName: e.title || '',
             eventDate,
-            eventTime: eventData.time || '18:00',
-            eventCity,
-            ticketPrice: eventData.ticketPrice?.toString() || '0',
-            totalTickets: eventData.totalTickets?.toString() || '100',
-            eventCategory: '', // Category is not stored in backend
-            description: eventData.description || '',
-            imageUri: imageUrl ? imageUrl : null,
-            imageUrl: imageUrl || null,
+            eventTime: e.time || '18:00',
+            address: e.location || '',
+            genderSelection: genderCap,
+            description: e.description || '',
+            imageUri: displayImageUrl || null,
+            imageUrl: displayImageUrl || null,
+            imagePath,
+            eventType: isFree ? 'free' : 'paid',
+            ticketPrice: ticketPriceNum > 0 ? String(ticketPriceNum) : '',
+            totalTickets: String(e.totalTickets ?? 100),
+            currency: 'PKR',
           });
         } else {
-          Alert.alert('Error', 'Event not found', [
-            { text: 'OK', onPress: () => router.back() },
-          ]);
+          setErrorMessage('Event not found');
         }
-      } catch (error: any) {
-        console.error('Error loading event:', error);
-        Alert.alert('Error', error.response?.data?.message || 'Failed to load event', [
-          { text: 'OK', onPress: () => router.back() },
-        ]);
+      } catch (err: any) {
+        setErrorMessage(err.response?.data?.message || err.message || 'Failed to load event');
       } finally {
         setLoading(false);
       }
     };
-
     loadEvent();
-  }, [id]);
+  }, [eventId]);
 
   const handleInputChange = (field: keyof EventFormData, value: string | Date | null) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
+    if (errors[field]) setErrors((prev) => ({ ...prev, [field]: undefined }));
   };
 
   const pickImage = async () => {
-    // Request permission
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (status !== 'granted') {
-      Alert.alert('Permission Required', 'We need access to your photos to upload event images.');
+      setErrorMessage('We need access to your photos to upload event images.');
+      setShowErrorModal(true);
       return;
     }
-
-    // Launch image picker
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
       allowsEditing: true,
       aspect: [16, 9],
       quality: 0.8,
     });
-
     if (!result.canceled && result.assets[0]) {
-      const asset = result.assets[0];
-      const imageUri = asset.uri;
-
+      const imageUri = result.assets[0].uri;
       setFormData((prev) => ({ ...prev, imageUri }));
-
-      // Upload image immediately
       await uploadImage(imageUri);
     }
   };
@@ -175,173 +206,164 @@ export default function EditEventScreen() {
     try {
       const response = await eventsAPI.uploadEventImage(imageUri);
       if (response.success) {
-        setFormData((prev) => ({ ...prev, imageUrl: response.imageUrl }));
+        const path = response.imageUrl ? toImagePath(response.imageUrl) : null;
+        setFormData((prev) => ({
+          ...prev,
+          imagePath: path,
+          imageUrl: response.imageUrl || null,
+        }));
       } else {
-        console.warn('Image upload failed, but continuing without image (optional)');
-        setFormData((prev) => ({ ...prev, imageUri: null, imageUrl: null }));
+        setFormData((prev) => ({ ...prev, imageUri: null, imageUrl: null, imagePath: null }));
       }
-    } catch (error: any) {
-      console.warn('Image upload error, continuing without image:', error.message);
-      setFormData((prev) => ({ ...prev, imageUri: null, imageUrl: null }));
+    } catch {
+      setFormData((prev) => ({ ...prev, imageUri: null, imageUrl: null, imagePath: null }));
     } finally {
       setUploadingImage(false);
     }
   };
 
+  const step1Valid =
+    Boolean(formData.eventName.trim()) &&
+    Boolean(formData.eventDate) &&
+    Boolean(formData.eventTime?.trim()) &&
+    Boolean(formData.genderSelection?.trim());
+
+  const validateStep1 = (): boolean => {
+    const nextErrors: Partial<Record<keyof EventFormData, string>> = {};
+    if (!formData.eventName.trim()) nextErrors.eventName = 'Event name is required';
+    if (!formData.eventDate) nextErrors.eventDate = 'Start date is required';
+    if (!formData.eventTime?.trim()) nextErrors.eventTime = 'Start time is required';
+    if (!formData.genderSelection?.trim()) nextErrors.genderSelection = 'Gender is required';
+    setErrors((prev) => ({ ...prev, ...nextErrors }));
+    return Object.keys(nextErrors).length === 0;
+  };
+
+  const step2Valid =
+    formData.eventType === 'free' ||
+    (formData.eventType === 'paid' &&
+      formData.ticketPrice.trim() !== '' &&
+      !Number.isNaN(Number(formData.ticketPrice)) &&
+      Number(formData.ticketPrice) >= 0);
+
+  const handleNext = () => {
+    if (!validateStep1()) return;
+    setStep(2);
+  };
+
   const handleSubmit = async () => {
-    // Validate all required fields
-    if (!formData.eventName) {
-      Alert.alert('Validation Error', 'Event Name is required');
-      return;
+    if (formData.eventType === 'paid') {
+      const parsed = Number(formData.ticketPrice);
+      if (formData.ticketPrice.trim() === '' || Number.isNaN(parsed) || parsed < 0) {
+        setErrors((prev) => ({ ...prev, ticketPrice: 'Cost per ticket is required' }));
+        return;
+      }
+      const tickets = parseInt(formData.totalTickets, 10);
+      if (Number.isNaN(tickets) || tickets < 1) {
+        setErrors((prev) => ({ ...prev, totalTickets: 'Enter a valid number of tickets' }));
+        return;
+      }
     }
-
-    if (!formData.eventLocation) {
-      Alert.alert('Validation Error', 'Event Location is required');
-      return;
-    }
-
-    if (!formData.eventDate) {
-      Alert.alert('Validation Error', 'Event Date is required');
-      return;
-    }
-
-    if (!formData.eventCity) {
-      Alert.alert('Validation Error', 'Event City is required');
-      return;
-    }
-
-    if (!formData.description || formData.description.length < 10) {
-      Alert.alert('Validation Error', 'Please provide an event description (at least 10 characters)');
-      return;
-    }
-
-    if (!formData.email || !formData.phone) {
-      Alert.alert('Validation Error', 'Please fill in your email and phone number');
-      return;
-    }
-
-    // Validate ticket price
-    if (formData.ticketPrice.trim() === '') {
-      Alert.alert('Validation Error', 'Please enter a ticket price (use 0 for free events)');
-      return;
-    }
-    const parsedPrice = Number(formData.ticketPrice);
-    if (Number.isNaN(parsedPrice) || parsedPrice < 0) {
-      Alert.alert('Validation Error', 'Ticket price must be a valid number greater than or equal to 0');
-      return;
-    }
-
-    // Validate total tickets
-    if (formData.totalTickets.trim() === '') {
-      Alert.alert('Validation Error', 'Please enter the total number of tickets');
-      return;
-    }
-    const parsedTotalTickets = Number(formData.totalTickets);
-    if (Number.isNaN(parsedTotalTickets) || parsedTotalTickets < 1) {
-      Alert.alert('Validation Error', 'Total tickets must be a valid number greater than 0');
-      return;
-    }
+    setErrors({});
 
     const isAuthenticated = useAppStore.getState().isAuthenticated;
     if (!isAuthenticated) {
-      Alert.alert('Login Required', 'Please login to update an event', [
-        { text: 'Cancel', style: 'cancel' },
-        { text: 'Login', onPress: () => router.push('/login') },
-      ]);
+      setErrorMessage('Please login to update an event.');
+      setShowErrorModal(true);
+      return;
+    }
+
+    if (!eventId) {
+      setErrorMessage('Event ID is missing');
+      setShowErrorModal(true);
       return;
     }
 
     setSaving(true);
     try {
-      const eventId = getEventId();
-      if (!eventId) {
-        Alert.alert('Error', 'Event ID is missing');
-        return;
-      }
-
-      // Handle image upload/update
-      let imageUrl: string | undefined = undefined;
-      
-      // If user selected a new image (not a URL), upload it
+      let imageToSend: string | undefined = formData.imagePath || undefined;
       if (formData.imageUri && !formData.imageUri.startsWith('http')) {
-        setUploadingImage(true);
-        try {
-          const uploadResponse = await eventsAPI.uploadEventImage(formData.imageUri);
-          if (uploadResponse.success) {
-            imageUrl = uploadResponse.imageUrl;
-            setFormData((prev) => ({ ...prev, imageUrl }));
-          } else {
-            console.warn('Image upload failed, continuing without image');
+        if (!formData.imagePath) {
+          setUploadingImage(true);
+          try {
+            const uploadResponse = await eventsAPI.uploadEventImage(formData.imageUri);
+            if (uploadResponse.success) {
+              const path = uploadResponse.imageUrl ? toImagePath(uploadResponse.imageUrl) : null;
+              imageToSend = path || undefined;
+            }
+          } catch {
+            imageToSend = undefined;
+          } finally {
+            setUploadingImage(false);
           }
-        } catch (uploadError: any) {
-          console.warn('Image upload error, continuing without image:', uploadError.message);
-        } finally {
-          setUploadingImage(false);
         }
-      } else if (formData.imageUrl) {
-        // Use already uploaded image URL
-        imageUrl = formData.imageUrl;
-      } else if (formData.imageUri && formData.imageUri.startsWith('http')) {
-        // Existing image URL (from event data)
-        imageUrl = formData.imageUri;
-      }
-      // If imageUri is null and there was an original image, user removed it - send empty string
-      else if (!formData.imageUri && event?.image) {
-        imageUrl = '';
+      } else if (!formData.imageUri && (event?.image || event?.imageUrl)) {
+        imageToSend = '';
       }
 
-      const eventDate = formData.eventDate.toISOString().split('T')[0];
-      
-      // Prepare update data
-      const updateData: any = {
-        title: formData.eventName,
-        description: formData.description,
-        date: eventDate,
-        time: formData.eventTime,
-        location: `${formData.eventLocation}, ${formData.eventCity}`,
-        email: formData.email,
-        phone: formData.phone,
-        ticketPrice: parsedPrice,
-        totalTickets: parsedTotalTickets,
+      const eventDate = formData.eventDate!;
+      const dateStr = eventDate.toISOString().split('T')[0];
+      const [hours, minutes] = formData.eventTime.split(':');
+      const timeStr = `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
+
+      const totalTickets =
+        formData.eventType === 'free' ? undefined : parseInt(formData.totalTickets, 10) || 100;
+
+      const updateData: Parameters<typeof eventsAPI.updateEvent>[1] = {
+        title: formData.eventName.trim(),
+        date: dateStr,
+        time: timeStr,
+        location: formData.address.trim() || undefined,
+        description: formData.description.trim() || undefined,
+        totalTickets,
+        ticketPrice: formData.eventType === 'free' ? 0 : Number(formData.ticketPrice),
+        email: user?.email || '',
+        phone: user?.phone || undefined,
       };
-
-      // Include image if it changed or was explicitly removed
-      if (imageUrl !== undefined && imageUrl !== event?.image) {
-        updateData.image = imageUrl;
-      }
+      if (imageToSend !== undefined) updateData.image = imageToSend;
 
       const response = await eventsAPI.updateEvent(String(eventId), updateData);
 
       if (response.success) {
-        Alert.alert('Success', 'Event updated successfully', [
-          {
-            text: 'OK',
-            onPress: () => {
-              router.back();
-            },
-          },
-        ]);
+        try {
+          const profileResponse = await authAPI.getProfile();
+          if (profileResponse.success && profileResponse.user) setUser(profileResponse.user);
+        } catch {}
+        router.back();
       } else {
-        Alert.alert('Error', response.message || 'Failed to update event');
+        setErrorMessage(response.event?.message || (response as any).message || 'Failed to update event');
+        setShowErrorModal(true);
       }
-    } catch (error: any) {
-      console.error('Error updating event:', error);
-      Alert.alert(
-        'Error',
-        error.response?.data?.message || error.message || 'Failed to update event. Please try again.'
-      );
+    } catch (err: any) {
+      setErrorMessage(err.response?.data?.message || err.message || 'Failed to update event. Please try again.');
+      setShowErrorModal(true);
     } finally {
       setSaving(false);
     }
   };
 
+  const timePickerValue = (() => {
+    const [h, m] = formData.eventTime.split(':').map(Number);
+    const d = formData.eventDate || new Date();
+    const x = new Date(d);
+    x.setHours(isNaN(h) ? 18 : h, isNaN(m) ? 0 : m, 0, 0);
+    return x;
+  })();
+
+  const inputRow = 'bg-gray-50 rounded-md py-2 px-3 flex-row items-center gap-2 border border-gray-200';
+  const iconWrap = 'w-8 h-8 rounded-full bg-gray-200 items-center justify-center';
+  const labelClass = 'text-gray-900 text-sm font-medium mb-1.5';
+
   if (loading) {
+    return <EventDetailsSkeleton />;
+  }
+
+  if (errorMessage && !event) {
     return (
-      <View className="flex-1 bg-white">
-        <View className="flex-1 items-center justify-center p-10">
-          <ActivityIndicator size="large" color="#DC2626" />
-          <Text className="text-gray-700 text-base mt-4">Loading event...</Text>
-        </View>
+      <View className="flex-1 bg-white items-center justify-center p-10">
+        <Text className="text-[#EF4444] text-lg mb-6">{errorMessage}</Text>
+        <TouchableOpacity className="bg-primary py-3 px-6 rounded-xl" onPress={() => router.back()}>
+          <Text className="text-white text-base font-semibold">Go Back</Text>
+        </TouchableOpacity>
       </View>
     );
   }
@@ -351,264 +373,394 @@ export default function EditEventScreen() {
       className="flex-1 bg-white"
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
-      <ScrollView
-        className="flex-1"
-        contentContainerStyle={{ paddingBottom: 40 }}
-        showsVerticalScrollIndicator={false}
-      >
-        <View className="flex-row items-center justify-between pt-[60px] px-3 pb-5">
-          <TouchableOpacity onPress={() => router.back()}>
-            <MaterialIcons name="arrow-back" size={24} color="#111827" />
-          </TouchableOpacity>
-          <Text className="text-gray-900 text-xl font-bold">Edit Event</Text>
-          <View style={{ width: 30 }} />
-        </View>
-
-        <View className="px-3">
-          <Text className="text-gray-900 text-sm font-semibold mb-2 mt-4">Name</Text>
-          <TextInput
-            className="bg-gray-50 border border-gray-200 rounded-xl py-3.5 px-4 text-gray-900 text-base"
-            placeholder="e.g. Fatima Ali"
-            placeholderTextColor="#6B7280"
-            value={formData.name}
-            onChangeText={(value) => handleInputChange('name', value)}
-          />
-
-          <Text className="text-gray-900 text-sm font-semibold mb-2 mt-4">Email</Text>
-          <TextInput
-            className="bg-gray-50 border border-gray-200 rounded-xl py-3.5 px-4 text-gray-900 text-base"
-            placeholder="e.g. fatimaali@gmail.com"
-            placeholderTextColor="#6B7280"
-            value={formData.email}
-            onChangeText={(value) => handleInputChange('email', value)}
-            keyboardType="email-address"
-            autoCapitalize="none"
-          />
-
-          <Text className="text-gray-900 text-sm font-semibold mb-2 mt-4">Phone Number</Text>
-          <View className="flex-row gap-2">
-            <TouchableOpacity className="bg-gray-50 border border-gray-200 rounded-xl py-3.5 px-3 flex-row items-center gap-2">
-              <Text className="text-gray-900 text-base font-semibold">PK</Text>
-              <MaterialIcons name="expand-more" size={16} color="#9CA3AF" />
-            </TouchableOpacity>
-            <TextInput
-              className="flex-1 bg-gray-50 border border-gray-200 rounded-xl py-3.5 px-4 text-gray-900 text-base"
-              placeholder="+92 334495437"
-              placeholderTextColor="#6B7280"
-              value={formData.phone}
-              onChangeText={(value) => handleInputChange('phone', value)}
-              keyboardType="phone-pad"
-            />
-          </View>
-
-          <Text className="text-gray-900 text-sm font-semibold mb-2 mt-4">Company Name</Text>
-          <TextInput
-            className="bg-gray-50 border border-gray-200 rounded-xl py-3.5 px-4 text-gray-900 text-base"
-            placeholder="e.g. Paymo events"
-            placeholderTextColor="#6B7280"
-            value={formData.companyName}
-            onChangeText={(value) => handleInputChange('companyName', value)}
-          />
-
-          <Text className="text-gray-900 text-sm font-semibold mb-2 mt-4">Event Name</Text>
-          <TextInput
-            className="bg-gray-50 border border-gray-200 rounded-xl py-3.5 px-4 text-gray-900 text-base"
-            placeholder="e.g. Catcha cat"
-            placeholderTextColor="#6B7280"
-            value={formData.eventName}
-            onChangeText={(value) => handleInputChange('eventName', value)}
-          />
-
-          <Text className="text-white text-sm font-semibold mb-2 mt-4">Event Location</Text>
-          <TextInput
-            className="bg-[#1F1F1F] border border-[#374151] rounded-xl py-3.5 px-4 text-white text-base"
-            placeholder="e.g LUMS"
-            placeholderTextColor="#6B7280"
-            value={formData.eventLocation}
-            onChangeText={(value) => handleInputChange('eventLocation', value)}
-          />
-
-          <Text className="text-white text-sm font-semibold mb-2 mt-4">Event Date</Text>
-          <TouchableOpacity
-            className="bg-[#1F1F1F] border border-[#374151] rounded-xl py-3.5 px-4 flex-row justify-between items-center"
-            onPress={() => setShowDatePicker(true)}
-          >
-            <Text className={`text-base ${formData.eventDate ? 'text-white' : 'text-[#6B7280]'}`}>
-              {formData.eventDate
-                ? formData.eventDate.toLocaleDateString('en-US', {
-                  month: 'long',
-                  day: 'numeric',
-                  year: 'numeric',
-                })
-                : 'Select Date'}
-            </Text>
-            <MaterialIcons name="expand-more" size={16} color="#9CA3AF" />
-          </TouchableOpacity>
-
-          {showDatePicker && (
-            <View>
-              {Platform.OS === 'ios' && (
-                <View className="flex-row justify-end gap-2 mt-2 mb-2">
-                  <TouchableOpacity
-                    className="bg-[#1F1F1F] px-4 py-2 rounded-lg"
-                    onPress={() => setShowDatePicker(false)}
-                  >
-                    <Text className="text-white text-sm">Cancel</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    className="bg-primary px-4 py-2 rounded-lg"
-                    onPress={() => setShowDatePicker(false)}
-                  >
-                    <Text className="text-white text-sm font-semibold">Done</Text>
-                  </TouchableOpacity>
-                </View>
-              )}
-              <DateTimePicker
-                value={formData.eventDate || new Date()}
-                mode="date"
-                display={Platform.OS === 'ios' ? 'spinner' : 'default'}
-                minimumDate={new Date()}
-                onChange={(event, selectedDate) => {
-                  if (Platform.OS === 'android') {
-                    setShowDatePicker(false);
-                    if (event.type === 'set' && selectedDate) {
-                      handleInputChange('eventDate', selectedDate);
-                    }
-                  } else {
-                    if (selectedDate) {
-                      handleInputChange('eventDate', selectedDate);
-                    }
-                  }
-                }}
+      {/* Header: back, progress bar, step label - same as create */}
+      <View className="pt-[52px] px-4 pb-4 border-b border-gray-200">
+        <View className="flex-row items-center justify-between mb-4">
+          <BackButton onPress={() => (step === 1 ? router.back() : setStep(1))} className="-ml-2" />
+          <View className="flex-1 flex-row items-center justify-center gap-2">
+            <View className="flex-1 h-1.5 rounded-full bg-gray-200 overflow-hidden">
+              <View
+                className="h-full rounded-full bg-primary"
+                style={{ width: step === 1 ? '50%' : '100%' }}
               />
             </View>
-          )}
+          </View>
+          <Text className="text-gray-900 text-sm font-medium ml-2 w-10 text-right">{step} of 2</Text>
+        </View>
+        <Text className="text-gray-900 text-2xl font-bold">
+          {step === 1 ? 'Event Details' : 'Payment and Ticket Details'}
+        </Text>
+      </View>
 
-          <Text className="text-white text-sm font-semibold mb-2 mt-4">Event Time</Text>
-          <TextInput
-            className="bg-[#1F1F1F] border border-[#374151] rounded-xl py-3.5 px-4 text-white text-base"
-            placeholder="e.g. 18:00"
-            placeholderTextColor="#6B7280"
-            value={formData.eventTime}
-            onChangeText={(value) => handleInputChange('eventTime', value)}
-          />
+      <ScrollView
+        className="flex-1"
+        contentContainerStyle={{
+          paddingBottom: 40 + keyboardHeight,
+          paddingHorizontal: 16,
+          paddingTop: 24,
+        }}
+        showsVerticalScrollIndicator={false}
+      >
+        {step === 1 && (
+          <>
+            <TouchableOpacity
+              onPress={pickImage}
+              disabled={uploadingImage}
+              className="w-full aspect-[16/9] rounded-2xl border-2 border-primary overflow-hidden bg-gray-50 mb-6"
+            >
+              {formData.imageUri ? (
+                <View className="w-full h-full relative">
+                  <Image
+                    source={{ uri: formData.imageUri }}
+                    className="w-full h-full"
+                    resizeMode="cover"
+                  />
+                  <View className="absolute top-3 left-0 right-0 flex-row justify-between px-3">
+                    <TouchableOpacity
+                      onPress={(e) => { e.stopPropagation(); pickImage(); }}
+                      className="w-10 h-10 rounded-full bg-black/50 items-center justify-center"
+                    >
+                      <MaterialIcons name="crop" size={20} color="#FFF" />
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      onPress={(e) => {
+                        e.stopPropagation();
+                        setFormData((prev) => ({ ...prev, imageUri: null, imageUrl: null, imagePath: null }));
+                      }}
+                      className="w-10 h-10 rounded-full bg-black/50 items-center justify-center"
+                    >
+                      <MaterialIcons name="close" size={20} color="#FFF" />
+                    </TouchableOpacity>
+                  </View>
+                  {uploadingImage && (
+                    <View className="absolute inset-0 bg-black/50 items-center justify-center">
+                      <ActivityIndicator color="#DC2626" size="large" />
+                    </View>
+                  )}
+                </View>
+              ) : (
+                <View className="flex-1 items-center justify-center">
+                  <MaterialIcons name="add-photo-alternate" size={48} color="#DC2626" />
+                  <Text className="text-[#9CA3AF] mt-2">Tap to add Thumbnail</Text>
+                </View>
+              )}
+            </TouchableOpacity>
 
-          <Text className="text-white text-sm font-semibold mb-2 mt-4">Event City</Text>
-          <TextInput
-            className="bg-[#1F1F1F] border border-[#374151] rounded-xl py-3.5 px-4 text-white text-base"
-            placeholder="Enter city name"
-            placeholderTextColor="#6B7280"
-            value={formData.eventCity}
-            onChangeText={(value) => handleInputChange('eventCity', value)}
-          />
+            <Text className={labelClass}>Event Name</Text>
+            <TextInput
+              className={`${inputRow} mb-1 text-sm ${errors.eventName ? 'border-[#EF4444]' : ''}`}
+              placeholder="name"
+              placeholderTextColor="#6B7280"
+              value={formData.eventName}
+              onChangeText={(v) => handleInputChange('eventName', v)}
+              style={{ color: '#111827' }}
+            />
+            {errors.eventName ? <Text className="text-[#EF4444] text-xs mb-3">{errors.eventName}</Text> : null}
 
-          <Text className="text-white text-sm font-semibold mb-2 mt-4">Ticket Price (PKR)</Text>
-          <TextInput
-            className="bg-[#1F1F1F] border border-[#374151] rounded-xl py-3.5 px-4 text-white text-base"
-            placeholder="e.g. 1500 (use 0 for free events)"
-            placeholderTextColor="#6B7280"
-            value={formData.ticketPrice}
-            onChangeText={(value) => handleInputChange('ticketPrice', value)}
-            keyboardType="numeric"
-          />
+            <View className="flex-row gap-2 mb-3">
+              <View className="flex-1">
+                <Text className={labelClass}>Start Date</Text>
+                <TouchableOpacity
+                  className={`${inputRow} ${errors.eventDate ? 'border-[#EF4444]' : ''}`}
+                  onPress={() => setShowDatePicker(true)}
+                >
+                  <View className={iconWrap}>
+                    <MaterialIcons name="event" size={18} color="#9CA3AF" />
+                  </View>
+                  <Text className={`text-sm ${formData.eventDate ? 'text-gray-900' : 'text-[#6B7280]'}`}>
+                    {formData.eventDate ? formatDateForDisplay(formData.eventDate) : 'Select date'}
+                  </Text>
+                </TouchableOpacity>
+                {errors.eventDate ? <Text className="text-[#EF4444] text-xs mt-1">{errors.eventDate}</Text> : null}
+              </View>
+              <View className="flex-1">
+                <Text className={labelClass}>Time</Text>
+                <TouchableOpacity
+                  className={`${inputRow} ${errors.eventTime ? 'border-[#EF4444]' : ''}`}
+                  onPress={() => setShowTimePicker(true)}
+                >
+                  <View className={iconWrap}>
+                    <MaterialIcons name="schedule" size={18} color="#9CA3AF" />
+                  </View>
+                  <Text className="text-gray-900 text-sm">{formData.eventTime}</Text>
+                </TouchableOpacity>
+                {errors.eventTime ? <Text className="text-[#EF4444] text-xs mt-1">{errors.eventTime}</Text> : null}
+              </View>
+            </View>
 
-          <Text className="text-white text-sm font-semibold mb-2 mt-4">Total Tickets</Text>
-          <TextInput
-            className="bg-[#1F1F1F] border border-[#374151] rounded-xl py-3.5 px-4 text-white text-base"
-            placeholder="e.g. 100"
-            placeholderTextColor="#6B7280"
-            value={formData.totalTickets}
-            onChangeText={(value) => handleInputChange('totalTickets', value)}
-            keyboardType="numeric"
-          />
-
-          <Text className="text-white text-sm font-semibold mb-2 mt-4">
-            Event Thumbnail <Text className="text-[#6B7280] text-xs">(Optional)</Text>
-          </Text>
-          <TouchableOpacity
-            className="bg-[#1F1F1F] border border-[#374151] rounded-xl py-4 px-4 items-center justify-center"
-            onPress={pickImage}
-            disabled={uploadingImage}
-          >
-            {formData.imageUri ? (
-              <View className="w-full items-center">
-                <Image
-                  source={{ uri: formData.imageUri }}
-                  className="w-full h-[200px] rounded-lg mb-2"
-                  resizeMode="cover"
-                />
-                {uploadingImage && (
-                  <View className="flex-row items-center">
-                    <ActivityIndicator color="#DC2626" size="small" />
-                    <Text className="text-primary text-sm ml-2">Uploading...</Text>
+            {showDatePicker && (
+              <View className="mb-4">
+                {Platform.OS === 'ios' && (
+                  <View className="flex-row justify-end gap-2 mb-2">
+                    <TouchableOpacity className="bg-gray-100 px-4 py-2 rounded-lg" onPress={() => setShowDatePicker(false)}>
+                      <Text className="text-gray-900 text-sm">Cancel</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity className="bg-primary px-4 py-2 rounded-lg" onPress={() => setShowDatePicker(false)}>
+                      <Text className="text-white text-sm font-semibold">Done</Text>
+                    </TouchableOpacity>
                   </View>
                 )}
-                {formData.imageUrl && !uploadingImage && (
-                  <Text className="text-[#10B981] text-sm">✓ Image uploaded</Text>
+                <DateTimePicker
+                  value={formData.eventDate || new Date()}
+                  mode="date"
+                  display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                  minimumDate={new Date()}
+                  onChange={(event, selectedDate) => {
+                    if (Platform.OS === 'android') {
+                      setShowDatePicker(false);
+                      if (event.type === 'set' && selectedDate) handleInputChange('eventDate', selectedDate);
+                    } else if (selectedDate) handleInputChange('eventDate', selectedDate);
+                  }}
+                />
+              </View>
+            )}
+
+            {showTimePicker && (
+              <View className="mb-4">
+                {Platform.OS === 'ios' && (
+                  <View className="flex-row justify-end gap-2 mb-2">
+                    <TouchableOpacity className="bg-gray-100 px-4 py-2 rounded-lg" onPress={() => setShowTimePicker(false)}>
+                      <Text className="text-gray-900 text-sm">Cancel</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity className="bg-primary px-4 py-2 rounded-lg" onPress={() => setShowTimePicker(false)}>
+                      <Text className="text-white text-sm font-semibold">Done</Text>
+                    </TouchableOpacity>
+                  </View>
                 )}
+                <DateTimePicker
+                  value={timePickerValue}
+                  mode="time"
+                  display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                  onChange={(event, selectedDate) => {
+                    if (Platform.OS === 'android') setShowTimePicker(false);
+                    if (selectedDate) handleInputChange('eventTime', formatTime(selectedDate));
+                  }}
+                />
+              </View>
+            )}
+
+            <Text className={labelClass}>Address <Text className="text-[#6B7280]">(optional)</Text></Text>
+            <View className={`${inputRow} mb-3`}>
+              <View className={iconWrap}>
+                <MaterialIcons name="location-on" size={18} color="#9CA3AF" />
+              </View>
+              <TextInput
+                className="flex-1 text-gray-900 text-sm"
+                placeholder="e.g. Islamabad, Pakistan"
+                placeholderTextColor="#6B7280"
+                value={formData.address}
+                onChangeText={(v) => handleInputChange('address', v)}
+              />
+            </View>
+
+            <Text className={labelClass}>Gender</Text>
+            <TouchableOpacity
+              className={`${inputRow} mb-1 ${errors.genderSelection ? 'border-[#EF4444]' : ''}`}
+              onPress={() => setShowGenderModal(true)}
+            >
+              <View className={iconWrap}>
+                <MaterialIcons name="person-outline" size={18} color="#9CA3AF" />
+              </View>
+              <Text className="text-gray-900 text-sm">{formData.genderSelection}</Text>
+              <MaterialIcons name="expand-more" size={20} color="#9CA3AF" />
+            </TouchableOpacity>
+            {errors.genderSelection ? <Text className="text-[#EF4444] text-xs mb-3">{errors.genderSelection}</Text> : null}
+
+            <RNModal visible={showGenderModal} transparent animationType="slide" onRequestClose={() => setShowGenderModal(false)}>
+              <Pressable className="flex-1 justify-end bg-black/60" onPress={() => setShowGenderModal(false)}>
+                <Pressable className="bg-white rounded-t-2xl border-t border-gray-200 px-4 pb-8 pt-2" onPress={(e) => e.stopPropagation()}>
+                  <View className="items-center pt-2 pb-3">
+                    <View className="w-10 h-1 rounded-full bg-gray-300" />
+                  </View>
+                  <Text className="text-gray-900 text-lg font-semibold mb-4">Gender Selection</Text>
+                  {GENDER_OPTIONS.map((opt) => {
+                    const isSelected = formData.genderSelection === opt;
+                    return (
+                      <TouchableOpacity
+                        key={opt}
+                        className={`flex-row items-center py-3.5 px-4 rounded-xl mb-2 ${isSelected ? 'bg-primary/10 border border-primary' : 'bg-gray-100 border border-transparent'}`}
+                        onPress={() => {
+                          handleInputChange('genderSelection', opt);
+                          setShowGenderModal(false);
+                        }}
+                        activeOpacity={0.8}
+                      >
+                        <View className="w-10 h-10 rounded-full bg-gray-200 items-center justify-center mr-3">
+                          <MaterialIcons name="person-outline" size={18} color="#9CA3AF" />
+                        </View>
+                        <Text className="text-gray-900 text-base font-medium flex-1">{opt}</Text>
+                        {isSelected && (
+                          <View className="w-6 h-6 rounded-full bg-primary items-center justify-center">
+                            <MaterialIcons name="check" size={14} color="#FFF" />
+                          </View>
+                        )}
+                      </TouchableOpacity>
+                    );
+                  })}
+                </Pressable>
+              </Pressable>
+            </RNModal>
+
+            <Text className={labelClass}>Description <Text className="text-[#6B7280]">(optional)</Text></Text>
+            <TextInput
+              className="bg-gray-50 border border-gray-200 rounded-md py-2 px-3 text-gray-900 text-sm min-h-[72px] mb-6"
+              placeholder="description"
+              placeholderTextColor="#6B7280"
+              value={formData.description}
+              onChangeText={(v) => handleInputChange('description', v)}
+              multiline
+              textAlignVertical="top"
+            />
+
+            <TouchableOpacity
+              onPress={handleNext}
+              disabled={!step1Valid}
+              className={`w-full py-2.5 rounded-md overflow-hidden ${!step1Valid ? 'opacity-50' : ''}`}
+              style={{ backgroundColor: '#DC2626', shadowColor: '#DC2626', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.3, shadowRadius: 4, elevation: 4 }}
+            >
+              <Text className="text-white text-center text-base font-semibold">Next</Text>
+            </TouchableOpacity>
+          </>
+        )}
+
+        {step === 2 && (
+          <>
+            <Text className={labelClass}>Event Type</Text>
+            <View className="flex-row gap-2 mb-4">
+              <TouchableOpacity
+                onPress={() => handleInputChange('eventType', 'paid')}
+                className={`flex-1 py-2.5 px-3 rounded-md border-2 flex-row items-center justify-center gap-2 ${
+                  formData.eventType === 'paid' ? 'border-primary bg-primary/10' : 'border-gray-200 bg-gray-50'
+                }`}
+              >
+                {formData.eventType === 'paid' ? (
+                  <View className="w-5 h-5 rounded-full bg-primary items-center justify-center">
+                    <MaterialIcons name="check" size={14} color="#FFF" />
+                  </View>
+                ) : (
+                  <View className="w-5 h-5 rounded-full border-2 border-[#6B7280]" />
+                )}
+                <Text className="text-gray-900 font-medium">Paid Event</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={() => handleInputChange('eventType', 'free')}
+                className={`flex-1 py-2.5 px-3 rounded-md border-2 flex-row items-center justify-center gap-2 ${
+                  formData.eventType === 'free' ? 'border-primary bg-primary/10' : 'border-gray-200 bg-gray-50'
+                }`}
+              >
+                {formData.eventType === 'free' ? (
+                  <View className="w-5 h-5 rounded-full bg-primary items-center justify-center">
+                    <MaterialIcons name="check" size={14} color="#FFF" />
+                  </View>
+                ) : (
+                  <View className="w-5 h-5 rounded-full border-2 border-[#6B7280]" />
+                )}
+                <Text className="text-gray-900 font-medium">Free Event</Text>
+              </TouchableOpacity>
+            </View>
+
+            {formData.eventType === 'paid' && (
+              <>
+                <Text className={labelClass}>Cost Per Ticket</Text>
+                <View className="flex-row items-center gap-2 mb-1">
+                  <View className="w-8 h-8 rounded-full bg-[#374151] items-center justify-center">
+                    <MaterialIcons name="account-balance-wallet" size={18} color="#9CA3AF" />
+                  </View>
+                  <TextInput
+                    className={`flex-1 bg-[#1F1F1F] border rounded-md py-2 px-3 text-white text-sm ${errors.ticketPrice ? 'border-[#EF4444]' : 'border-[#374151]'}`}
+                    placeholder="e.g. 600"
+                    placeholderTextColor="#6B7280"
+                    value={formData.ticketPrice}
+                    onChangeText={(v) => handleInputChange('ticketPrice', v)}
+                    keyboardType="numeric"
+                  />
+                </View>
+                {errors.ticketPrice ? <Text className="text-[#EF4444] text-xs mb-3">{errors.ticketPrice}</Text> : null}
+                <Text className={labelClass}>Select Currency</Text>
                 <TouchableOpacity
-                  className="mt-2"
-                  onPress={() => setFormData((prev) => ({ ...prev, imageUri: null, imageUrl: null }))}
+                  className="flex-row items-center gap-2 bg-[#1F1F1F] border border-[#374151] rounded-md py-2 px-3 mb-4"
+                  onPress={() => setShowCurrencyModal(true)}
+                  activeOpacity={0.8}
                 >
-                  <Text className="text-[#EF4444] text-sm">Remove Image</Text>
+                  <View className="w-8 h-8 rounded-full bg-[#374151] items-center justify-center">
+                    <Text className="text-lg">{CURRENCY_OPTIONS[0]?.flag ?? '🇵🇰'}</Text>
+                  </View>
+                  <Text className="text-white text-base flex-1">{formData.currency}</Text>
+                  <MaterialIcons name="expand-more" size={20} color="#9CA3AF" />
                 </TouchableOpacity>
-              </View>
-            ) : (
-              <View className="flex-row items-center">
-                <MaterialIcons name="add-photo-alternate" size={24} color="#DC2626" />
-                <Text className="text-primary text-base font-semibold ml-2">
-                  {uploadingImage ? 'Uploading...' : 'Select Image from Gallery'}
-                </Text>
-              </View>
+
+                <RNModal visible={showCurrencyModal} transparent animationType="slide" onRequestClose={() => setShowCurrencyModal(false)}>
+                  <Pressable className="flex-1 justify-end bg-black/60" onPress={() => setShowCurrencyModal(false)}>
+                    <Pressable className="bg-white rounded-t-2xl border-t border-gray-200 px-4 pb-8 pt-2" onPress={(e) => e.stopPropagation()}>
+                      <View className="items-center pt-2 pb-3">
+                        <View className="w-10 h-1 rounded-full bg-gray-300" />
+                      </View>
+                      <Text className="text-gray-900 text-lg font-semibold mb-4">Select Currency</Text>
+                      {CURRENCY_OPTIONS.map((opt) => (
+                        <TouchableOpacity
+                          key={opt.code}
+                          className={`flex-row items-center py-3.5 px-4 rounded-xl mb-2 ${formData.currency === opt.code ? 'bg-primary/10 border border-primary' : 'bg-gray-100 border border-transparent'}`}
+                          onPress={() => {
+                            handleInputChange('currency', opt.code);
+                            setShowCurrencyModal(false);
+                          }}
+                          activeOpacity={0.8}
+                        >
+                          <View className="w-10 h-10 rounded-full bg-gray-200 items-center justify-center mr-3">
+                            <Text className="text-xl">{opt.flag}</Text>
+                          </View>
+                          <View className="flex-1">
+                            <Text className="text-gray-900 text-base font-medium">{opt.code}</Text>
+                            <Text className="text-[#9CA3AF] text-sm">{opt.label}</Text>
+                          </View>
+                          {formData.currency === opt.code && (
+                            <View className="w-6 h-6 rounded-full bg-primary items-center justify-center">
+                              <MaterialIcons name="check" size={14} color="#FFF" />
+                            </View>
+                          )}
+                        </TouchableOpacity>
+                      ))}
+                    </Pressable>
+                  </Pressable>
+                </RNModal>
+
+                <Text className={labelClass}>Total Tickets</Text>
+                <TextInput
+                  className={`bg-gray-50 border rounded-md py-2 px-3 text-gray-900 text-sm mb-1 ${errors.totalTickets ? 'border-[#EF4444]' : 'border-gray-200'}`}
+                  placeholder="e.g. 100"
+                  placeholderTextColor="#6B7280"
+                  value={formData.totalTickets}
+                  onChangeText={(v) => handleInputChange('totalTickets', v)}
+                  keyboardType="numeric"
+                />
+                {errors.totalTickets ? <Text className="text-[#EF4444] text-xs mb-4">{errors.totalTickets}</Text> : null}
+              </>
             )}
-          </TouchableOpacity>
 
-          <Text className="text-white text-sm font-semibold mb-2 mt-4">Event Category</Text>
-          <TouchableOpacity
-            className="bg-[#1F1F1F] border border-[#374151] rounded-xl py-3.5 px-4 flex-row justify-between items-center"
-            onPress={() => {
-              Alert.alert(
-                'Select Category',
-                '',
-                categories.map((cat) => ({
-                  text: cat,
-                  onPress: () => handleInputChange('eventCategory', cat),
-                }))
-              );
-            }}
-          >
-            <Text className={`text-base ${formData.eventCategory ? 'text-white' : 'text-[#6B7280]'}`}>
-              {formData.eventCategory || 'Select Category'}
-            </Text>
-            <MaterialIcons name="expand-more" size={16} color="#9CA3AF" />
-          </TouchableOpacity>
-
-          <Text className="text-white text-sm font-semibold mb-2 mt-4">What is your event about</Text>
-          <TextInput
-            className="bg-[#1F1F1F] border border-[#374151] rounded-xl py-3.5 px-4 text-white text-base min-h-[120px] pt-3.5"
-            placeholder="Enter a description..."
-            placeholderTextColor="#6B7280"
-            value={formData.description}
-            onChangeText={(value) => handleInputChange('description', value)}
-            multiline
-            numberOfLines={6}
-            textAlignVertical="top"
-          />
-
-          <TouchableOpacity
-            className={`bg-primary py-4 rounded-xl items-center mt-8 ${saving ? 'opacity-60' : ''}`}
-            onPress={handleSubmit}
-            disabled={saving}
-          >
-            {saving ? (
-              <ActivityIndicator color="#FFFFFF" />
-            ) : (
-              <Text className="text-white text-base font-semibold">Update Event</Text>
-            )}
-          </TouchableOpacity>
-        </View>
+            <TouchableOpacity
+              onPress={handleSubmit}
+              disabled={saving || !step2Valid}
+              className={`w-full py-2.5 rounded-md bg-primary items-center justify-center mt-2 ${saving || !step2Valid ? 'opacity-60' : ''}`}
+            >
+              {saving ? (
+                <ActivityIndicator color="#FFF" />
+              ) : (
+                <Text className="text-white text-base font-semibold">Update Event</Text>
+              )}
+            </TouchableOpacity>
+          </>
+        )}
       </ScrollView>
+
+      <Modal
+        visible={showErrorModal}
+        onClose={() => setShowErrorModal(false)}
+        title="Error"
+        message={errorMessage}
+        primaryButtonText="OK"
+        onPrimaryPress={() => setShowErrorModal(false)}
+        variant="error"
+      />
     </KeyboardAvoidingView>
   );
 }
-

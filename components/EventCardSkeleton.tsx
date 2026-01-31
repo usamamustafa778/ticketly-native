@@ -49,11 +49,10 @@ export const EventCardSkeleton: React.FC = () => {
 
 const styles = StyleSheet.create({
   card: {
-    width: '49%',
+    width: '100%',
     backgroundColor: '#FFF1F2', // rose-50 (light red)
     borderRadius: 8,
     overflow: 'hidden',
-    marginBottom: 8,
   },
   imageBlock: {
     width: '100%',

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   View,
   Text,
@@ -10,6 +10,7 @@ import {
   RefreshControl,
   Modal as RNModal,
   Pressable,
+  Animated,
 } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useAppStore } from '@/store/useAppStore';
@@ -17,6 +18,8 @@ import { eventsAPI, type Event } from '@/lib/api/events';
 import { ticketsAPI } from '@/lib/api/tickets';
 import { authAPI } from '@/lib/api/auth';
 import { Modal } from '@/components/Modal';
+import { BackButton } from '@/components/BackButton';
+import { EventDetailsSkeleton } from '@/components/EventDetailsSkeleton';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { getEventImageUrl } from '@/lib/utils/imageUtils';
 
@@ -33,6 +36,9 @@ export default function EventDetailsScreen() {
   const [error, setError] = useState<string | null>(null);
   const [isLiked, setIsLiked] = useState(false);
   const [likeCount, setLikeCount] = useState(0);
+  const likeScale = useRef(new Animated.Value(1)).current;
+  const likeApiInProgress = useRef(false);
+  const pendingLikeAction = useRef<'like' | 'unlike' | null>(null);
   const [isRegistered, setIsRegistered] = useState(false);
   const [showModal, setShowModal] = useState(false);
   const [modalMessage, setModalMessage] = useState('');
@@ -140,15 +146,72 @@ export default function EventDetailsScreen() {
     fetchUserTickets();
   }, [event, user, id]);
 
+  // Animate heart: scale up for like, scale down for unlike, then restore
+  const animateLike = useCallback((liked: boolean) => {
+    const toValue = liked ? 1.25 : 0.85;
+    Animated.sequence([
+      Animated.spring(likeScale, { toValue, useNativeDriver: true, speed: 50, bounciness: 12 }),
+      Animated.spring(likeScale, { toValue: 1, useNativeDriver: true, speed: 50, bounciness: 8 }),
+    ]).start();
+  }, [likeScale]);
+
+  // Execute the actual like/unlike API call
+  const executeLikeApi = useCallback(async (action: 'like' | 'unlike', eventId: string) => {
+    likeApiInProgress.current = true;
+    try {
+      if (action === 'unlike') {
+        await eventsAPI.unlikeEvent(eventId);
+      } else {
+        await eventsAPI.likeEvent(eventId);
+      }
+      // Refresh profile to update liked events list
+      try {
+        const profileRes = await authAPI.getProfile();
+        if (profileRes.success && profileRes.user) setUser(profileRes.user);
+      } catch (_) {}
+    } catch (err) {
+      console.error('Like API error:', err);
+    } finally {
+      likeApiInProgress.current = false;
+      // If there's a pending action queued, execute it
+      if (pendingLikeAction.current) {
+        const nextAction = pendingLikeAction.current;
+        pendingLikeAction.current = null;
+        executeLikeApi(nextAction, eventId);
+      }
+    }
+  }, [setUser]);
+
+  const handleLike = useCallback(() => {
+    const isAuthenticated = useAppStore.getState().isAuthenticated;
+    if (!isAuthenticated) {
+      setLoginModalMessage('Please login to like events.');
+      setShowLoginModal(true);
+      return;
+    }
+    if (!event) return;
+    const eventId = event._id || (event as any).id;
+
+    // Optimistic UI update immediately
+    const newLiked = !isLiked;
+    setIsLiked(newLiked);
+    setLikeCount((prev) => (newLiked ? prev + 1 : Math.max(0, prev - 1)));
+    animateLike(newLiked);
+
+    const action: 'like' | 'unlike' = newLiked ? 'like' : 'unlike';
+
+    // If API call in progress, queue the latest action (overwrite previous pending)
+    if (likeApiInProgress.current) {
+      pendingLikeAction.current = action;
+      return;
+    }
+
+    // Execute API call
+    executeLikeApi(action, eventId);
+  }, [event, isLiked, animateLike, executeLikeApi]);
+
   if (loading) {
-    return (
-      <View className="flex-1 bg-white">
-        <View className="flex-1 items-center justify-center p-10">
-          <ActivityIndicator size="large" color="#DC2626" />
-          <Text className="text-gray-700 text-base mt-4">Loading event...</Text>
-        </View>
-      </View>
-    );
+    return <EventDetailsSkeleton />;
   }
 
   if (error || !event) {
@@ -166,39 +229,6 @@ export default function EventDetailsScreen() {
       </View>
     );
   }
-
-  const handleLike = async () => {
-    const isAuthenticated = useAppStore.getState().isAuthenticated;
-    if (!isAuthenticated) {
-      setLoginModalMessage('Please login to like events.');
-      setShowLoginModal(true);
-      return;
-    }
-    if (!event) return;
-    const eventId = event._id || (event as any).id;
-    try {
-      if (isLiked) {
-        const res = await eventsAPI.unlikeEvent(eventId);
-        if (res.success) {
-          setIsLiked(false);
-          setLikeCount(res.likeCount ?? likeCount - 1);
-        }
-      } else {
-        const res = await eventsAPI.likeEvent(eventId);
-        if (res.success) {
-          setIsLiked(true);
-          setLikeCount(res.likeCount ?? likeCount + 1);
-        }
-      }
-      // Refresh profile to update liked events list
-      try {
-        const profileRes = await authAPI.getProfile();
-        if (profileRes.success && profileRes.user) setUser(profileRes.user);
-      } catch (_) {}
-    } catch (err) {
-      console.error('Like error:', err);
-    }
-  };
 
   const handleRegister = async () => {
     const isAuthenticated = useAppStore.getState().isAuthenticated;
@@ -335,12 +365,11 @@ export default function EventDetailsScreen() {
             className="w-full h-full"
             resizeMode="cover"
           />
-          <TouchableOpacity
-            className="absolute top-[50px] left-5 bg-black/50 w-10 h-10 rounded-full items-center justify-center"
+          <BackButton
+            variant="dark"
+            className="absolute top-[50px] left-5"
             onPress={() => router.back()}
-          >
-            <MaterialIcons name="arrow-back" size={20} color="#FFFFFF" />
-          </TouchableOpacity>
+          />
         </View>
 
         {/* Event Info Card */}
@@ -352,11 +381,13 @@ export default function EventDetailsScreen() {
               onPress={handleLike}
               activeOpacity={0.7}
             >
-              <MaterialIcons
-                name={isLiked ? "favorite" : "favorite-border"}
-                size={20}
-                color={isLiked ? "#EF4444" : "#9CA3AF"}
-              />
+              <Animated.View style={{ transform: [{ scale: likeScale }] }}>
+                <MaterialIcons
+                  name={isLiked ? "favorite" : "favorite-border"}
+                  size={20}
+                  color={isLiked ? "#EF4444" : "#9CA3AF"}
+                />
+              </Animated.View>
               <Text className="text-gray-700 text-sm font-semibold">{likeCount}</Text>
             </TouchableOpacity>
           </View>

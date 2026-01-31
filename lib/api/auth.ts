@@ -243,7 +243,7 @@ export const authAPI = {
   },
 
   // Upload Profile Image
-  uploadProfileImage: async (imageUri: string): Promise<{ success: boolean; message: string; profileImage: string; profileImageUrl?: string; user?: UserProfile }> => {
+  uploadProfileImage: async (imageUri: string): Promise<{ success: boolean; message: string; profileImageUrl: string; user?: UserProfile }> => {
     // Platform detection: Use Platform.OS as the primary check
     const isWeb = Platform.OS === 'web';
 
@@ -348,7 +348,7 @@ export const authAPI = {
 
         console.log('✅ Web upload successful:', {
           success: response.data?.success,
-          profileImage: response.data?.profileImage,
+          profileImageUrl: response.data?.profileImageUrl,
         });
 
         return response.data;
@@ -433,7 +433,7 @@ export const authAPI = {
 
       console.log('✅ [RN] Profile upload successful:', {
         success: data?.success,
-        profileImage: data?.profileImage,
+        profileImageUrl: data?.profileImageUrl,
       });
 
       return data;
