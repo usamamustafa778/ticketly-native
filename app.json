@@ -21,9 +21,10 @@
       "targetSdkVersion": 34,
       "minSdkVersion": 23,
       "permissions": [
-        "READ_EXTERNAL_STORAGE",
-        "READ_MEDIA_IMAGES",
-        "CAMERA"
+        "android.permission.READ_EXTERNAL_STORAGE",
+        "android.permission.READ_MEDIA_IMAGES",
+        "android.permission.CAMERA",
+        "android.permission.RECORD_AUDIO"
       ]
     },
     "ios": {
@@ -72,7 +73,10 @@
       "fallbackToCacheTimeout": 0
     },
     "extra": {
-      "router": {}
+      "router": {},
+      "eas": {
+        "projectId": "41b7da90-a859-433e-b22c-c6b9a175a5bd"
+      }
     }
   }
 }
