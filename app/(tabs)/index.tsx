@@ -4,7 +4,6 @@ import { Modal } from '@/components/Modal';
 import { authAPI, PROFILE_CACHE_KEY } from '@/lib/api/auth';
 import type { Event } from '@/lib/api/events';
 import { eventsAPI } from '@/lib/api/events';
-import { API_BASE_URL } from '@/lib/config';
 import { getEventImageUrl, getProfileImageUrl } from '@/lib/utils/imageUtils';
 import { useAppStore } from '@/store/useAppStore';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
@@ -147,29 +146,6 @@ const CARD_WIDTH = width * 0.82; // 82% of screen width for better peek effect
 const CARD_SPACING = 16; // Space between cards
 const HORIZONTAL_PADDING = (width - CARD_WIDTH) / 2; // Center padding to center the cards
 
-// Normalize profile URLs coming from backend (especially localhost URLs)
-const normalizeProfileUrl = (url?: string | null): string | undefined => {
-  if (!url) return undefined;
-
-  // If backend returned a localhost URL (old data), rewrite it to use the current API base URL
-  if (url.includes('localhost') || url.includes('127.0.0.1')) {
-    const baseUrl = API_BASE_URL.replace('/api', '');
-    try {
-      const parsed = new URL(url);
-      const path = parsed.pathname || '';
-      return `${baseUrl}${path}`;
-    } catch {
-      const uploadsIndex = url.indexOf('/uploads');
-      if (uploadsIndex !== -1) {
-        const path = url.substring(uploadsIndex);
-        return `${baseUrl}${path}`;
-      }
-    }
-  }
-
-  return url;
-};
-
 // Derive numeric price for cards: event.price { price, currency } or ticketPrice
 function getEventPrice(apiEvent: Event): number {
   if (apiEvent.price?.price === 'free' || apiEvent.price?.currency === null) return 0;
@@ -201,7 +177,7 @@ const convertEvent = (apiEvent: Event) => {
     joinedUsers: (apiEvent.joinedUsers || []).map((user) => ({
       id: user._id,
       name: user.name,
-      avatarUrl: normalizeProfileUrl(user.profileImageUrl || undefined),
+      avatarUrl: getProfileImageUrl({ profileImageUrl: user.profileImageUrl }) || undefined,
     })),
     joinedCount: apiEvent.joinedCount ?? (apiEvent.joinedUsers?.length ?? 0),
   };
@@ -240,7 +216,7 @@ const convertCachedEvent = (apiEvent: any) => {
     joinedUsers: (apiEvent.joinedUsers || []).map((u: any) => ({
       id: u._id || u.id,
       name: u.name || u.fullName,
-      avatarUrl: normalizeProfileUrl(u.profileImageUrl || u.avatarUrl),
+      avatarUrl: getProfileImageUrl({ profileImageUrl: u.profileImageUrl }) || undefined,
     })),
     joinedCount: apiEvent.joinedCount ?? (apiEvent.joinedUsers?.length ?? 0),
   };

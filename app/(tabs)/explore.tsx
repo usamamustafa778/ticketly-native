@@ -51,7 +51,7 @@ const convertEvent = (apiEvent: Event) => {
     joinedUsers: (apiEvent.joinedUsers || []).map((user) => ({
       id: user._id,
       name: user.name,
-      avatarUrl: user.profileImageUrl || undefined,
+      avatarUrl: getProfileImageUrl({ profileImageUrl: user.profileImageUrl }) || undefined,
     })),
     joinedCount: apiEvent.joinedCount ?? (apiEvent.joinedUsers?.length ?? 0),
   };
