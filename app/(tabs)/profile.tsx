@@ -31,7 +31,8 @@ const ACCESS_TOKEN_KEY = 'accessToken';
 const REFRESH_TOKEN_KEY = 'refreshToken';
 
 // Helper function to convert API event to app event format
-const convertEvent = (apiEvent: any) => {
+// currentUserProfileImageUrl: fallback for own created events when API omits host profile image
+const convertEvent = (apiEvent: any, currentUserProfileImageUrl?: string | null) => {
   // Handle both _id and id fields (backend may return either)
   const eventId = apiEvent._id || apiEvent.id || (apiEvent as any)?._id || (apiEvent as any)?.id;
 
@@ -40,6 +41,8 @@ const convertEvent = (apiEvent: any) => {
   }
 
   const dateStr = apiEvent.date ? (String(apiEvent.date).includes('T') ? String(apiEvent.date).split('T')[0] : apiEvent.date) : '';
+  const hostAvatarFromApi = apiEvent.createdBy ? getProfileImageUrl(apiEvent.createdBy as any) : null;
+  const hostAvatarUrl = hostAvatarFromApi || currentUserProfileImageUrl || null;
   return {
     id: eventId || '',
     title: apiEvent.title || '',
@@ -56,7 +59,7 @@ const convertEvent = (apiEvent: any) => {
     accessType: (apiEvent.ticketPrice || 0) > 0 ? 'paid' as const : 'open' as const,
     registeredUsers: [],
     likedUsers: [],
-    hostAvatarUrl: apiEvent.createdBy ? getProfileImageUrl(apiEvent.createdBy as any) : null,
+    hostAvatarUrl,
     joinedUsers: (apiEvent.joinedUsers || []).map((u: any) => ({
       id: u._id || u.id,
       name: u.name || u.fullName,
@@ -279,7 +282,8 @@ export default function ProfileScreen() {
         if (response.user.createdEvents && Array.isArray(response.user.createdEvents) && response.user.createdEvents.length > 0) {
           const firstItem = response.user.createdEvents[0];
           if (typeof firstItem === 'object' && firstItem !== null) {
-            const created = response.user.createdEvents.map((apiEvent: any) => convertEvent(apiEvent));
+            const profileImg = (response.user as any)?.profileImageUrl ?? (response.user ? getProfileImageUrl(response.user as any) : null);
+            const created = response.user.createdEvents.map((apiEvent: any) => convertEvent(apiEvent, profileImg));
             setMyEvents(created);
           } else {
             await loadMyEvents(false);
@@ -355,7 +359,8 @@ export default function ProfileScreen() {
       setUser(u);
       // Apply created events from cache
       if (u.createdEvents && Array.isArray(u.createdEvents) && u.createdEvents.length > 0 && typeof u.createdEvents[0] === 'object') {
-        setMyEvents(u.createdEvents.map((e: any) => convertEvent(e)));
+        const profileImg = (u as any)?.profileImageUrl ?? getProfileImageUrl(u as any);
+        setMyEvents(u.createdEvents.map((e: any) => convertEvent(e, profileImg)));
       } else {
         setMyEvents([]);
       }
@@ -387,7 +392,8 @@ export default function ProfileScreen() {
       }
       const response = await eventsAPI.getMyEvents();
       if (response.success && response.events) {
-        const converted = response.events.map((apiEvent: any) => convertEvent(apiEvent));
+        const profileImg = user ? getProfileImageUrl(user as any) : null;
+        const converted = response.events.map((apiEvent: any) => convertEvent(apiEvent, profileImg));
         setMyEvents(converted);
       }
     } catch (error: any) {
@@ -716,7 +722,7 @@ export default function ProfileScreen() {
           </View>
           <TouchableOpacity
             className="flex-row items-center gap-2 mb-1"
-            onPress={() => router.push('/settings')}
+            onPress={() => router.push('/settings?open=profile')}
             activeOpacity={0.7}
           >
             <Text className="text-gray-900 text-2xl font-bold">{user.fullName}</Text>
@@ -776,6 +782,20 @@ export default function ProfileScreen() {
         {/* Events List - swipe area for tab change */}
         <View className="mb-8">
           {renderEvents()}
+          {activeTab === 'liked' && (
+            <View className="flex-row items-center justify-center gap-2 px-4 py-6">
+              <Text className="text-[#6B7280] text-sm text-center flex-1">
+                Choose who can see your liked events on your public profile
+              </Text>
+              <TouchableOpacity
+                onPress={() => router.push('/settings?open=liked')}
+                activeOpacity={0.7}
+                className="w-8 h-8 rounded-full bg-gray-100 items-center justify-center"
+              >
+                <MaterialIcons name="edit" size={18} color="#DC2626" />
+              </TouchableOpacity>
+            </View>
+          )}
         </View>
       </ScrollView>
 

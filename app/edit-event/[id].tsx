@@ -15,6 +15,7 @@ import {
 } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useAppStore } from '@/store/useAppStore';
+import { formatApiError } from '@/lib/utils/errorUtils';
 import { authAPI } from '@/lib/api/auth';
 import { eventsAPI, type Event } from '@/lib/api/events';
 import { Modal } from '@/components/Modal';
@@ -168,7 +169,7 @@ export default function EditEventScreen() {
           setErrorMessage('Event not found');
         }
       } catch (err: any) {
-        setErrorMessage(err.response?.data?.message || err.message || 'Failed to load event');
+        setErrorMessage(formatApiError(err, 'Failed to load event'));
       } finally {
         setLoading(false);
       }
@@ -330,11 +331,11 @@ export default function EditEventScreen() {
         } catch {}
         router.back();
       } else {
-        setErrorMessage(response.event?.message || (response as any).message || 'Failed to update event');
+        setErrorMessage(formatApiError(response, (response as any).message || 'Failed to update event'));
         setShowErrorModal(true);
       }
     } catch (err: any) {
-      setErrorMessage(err.response?.data?.message || err.message || 'Failed to update event. Please try again.');
+      setErrorMessage(formatApiError(err, 'Failed to update event. Please try again.'));
       setShowErrorModal(true);
     } finally {
       setSaving(false);

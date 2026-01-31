@@ -451,7 +451,7 @@ export default function TicketScreen() {
                   </Text>
                 </View>
               </View>
-              {ticket.accessKey && (
+              {ticket.status === 'confirmed' && ticket.accessKey ? (
                 <View className="ml-4">
                   <View className="bg-white p-2 rounded-lg border border-primary">
                     <QRCode
@@ -462,6 +462,10 @@ export default function TicketScreen() {
                     />
                   </View>
                 </View>
+              ) : (
+                <View className="ml-4 bg-gray-100 p-3 rounded-lg border border-gray-200 min-w-[70px] min-h-[70px] items-center justify-center">
+                  <Text className="text-[10px] text-gray-500 text-center max-w-[70px]">QR code is given after payment confirmed</Text>
+                </View>
               )}
             </View>
             <View className="h-px border-t-2 border-primary border-dashed my-3.5" />
@@ -470,8 +474,10 @@ export default function TicketScreen() {
             {ticket.createdAt && (
               <Text className="text-[11px] text-gray-500 mt-3.5 mb-1">{formatTimestamp(ticket.createdAt)}</Text>
             )}
-            {ticket.accessKey && (
+            {ticket.status === 'confirmed' && ticket.accessKey ? (
               <Text className="text-[11px] text-primary font-semibold">ACCESS KEY: {ticket.accessKey}</Text>
+            ) : (
+              <Text className="text-[11px] text-gray-500 italic">Access key is given after payment confirmed</Text>
             )}
           </View>
         </View>

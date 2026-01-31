@@ -1,8 +1,9 @@
 import { BackButton } from '@/components/BackButton';
 import { Modal } from '@/components/Modal';
 import { authAPI } from '@/lib/api/auth';
-import { eventsAPI, type EventPrice } from '@/lib/api/events';
+import { eventsAPI } from '@/lib/api/events';
 import { useAppStore } from '@/store/useAppStore';
+import { formatApiError } from '@/lib/utils/errorUtils';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import * as ImagePicker from 'expo-image-picker';
@@ -149,7 +150,7 @@ export default function CreateEventScreen() {
     };
   }, []);
 
-  const [formData, setFormData] = useState<EventFormData>({
+  const initialFormData: EventFormData = {
     eventName: '',
     eventDate: null,
     eventTime: '18:00',
@@ -163,7 +164,8 @@ export default function CreateEventScreen() {
     ticketPrice: '',
     totalTickets: '100',
     currency: 'PKR',
-  });
+  };
+  const [formData, setFormData] = useState<EventFormData>(initialFormData);
 
   const stepRef = useRef(step);
   stepRef.current = step;
@@ -341,12 +343,8 @@ export default function CreateEventScreen() {
       const [hours, minutes] = formData.eventTime.split(':');
       const timeStr = `${hours.padStart(2, '0')}:${minutes.padStart(2, '0')}`;
 
-      const pricePayload: EventPrice =
-        formData.eventType === 'free'
-          ? { price: 'free', currency: null }
-          : { price: Number(formData.ticketPrice), currency: 'PKR' };
       const totalTickets = formData.eventType === 'free' ? undefined : parseInt(formData.totalTickets, 10) || 100;
-      const ticketPriceCompat = formData.eventType === 'free' ? 0 : Number(formData.ticketPrice);
+      const ticketPrice = formData.eventType === 'free' ? 0 : Number(formData.ticketPrice);
 
       const response = await eventsAPI.createEvent({
         title: formData.eventName.trim(),
@@ -356,16 +354,17 @@ export default function CreateEventScreen() {
         description: formData.description.trim() || undefined,
         image: imageToSend,
         email: user?.email || '',
-        organizerName: user?.fullName || undefined,
         phone: user?.phone || undefined,
         gender: genderToApi(formData.genderSelection),
-        price: pricePayload,
+        ticketPrice,
         totalTickets,
-        ticketPrice: ticketPriceCompat,
       });
 
       if (response.success) {
         await AsyncStorage.removeItem(CREATE_EVENT_DRAFT_KEY);
+        setFormData(initialFormData);
+        setStep(1);
+        setErrors({});
         const eventId = response.event?.id || (response.event as any)?._id;
         if (eventId) setCreatedEventId(String(eventId));
         try {
@@ -374,11 +373,11 @@ export default function CreateEventScreen() {
         } catch {}
         setShowSuccessModal(true);
       } else {
-        setErrorMessage(response.message || 'Failed to create event');
+        setErrorMessage(formatApiError(response, response.message || 'Failed to create event'));
         setShowErrorModal(true);
       }
     } catch (error: any) {
-      setErrorMessage(error.response?.data?.message || 'Failed to create event. Please try again.');
+      setErrorMessage(formatApiError(error, 'Failed to create event. Please try again.'));
       setShowErrorModal(true);
     } finally {
       setLoading(false);

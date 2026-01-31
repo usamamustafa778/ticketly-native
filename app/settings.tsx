@@ -10,8 +10,9 @@ import {
   ActivityIndicator,
   RefreshControl,
 } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { BackButton } from '@/components/BackButton';
+import { CollapsibleSection } from '@/components/CollapsibleSection';
 import { Modal } from '@/components/Modal';
 import { useAppStore } from '@/store/useAppStore';
 import { authAPI } from '@/lib/api/auth';
@@ -24,10 +25,17 @@ const REFRESH_TOKEN_KEY = 'refreshToken';
 
 export default function SettingsScreen() {
   const router = useRouter();
+  const { open } = useLocalSearchParams<{ open?: string }>();
   const user = useAppStore((state) => state.user);
   const setUser = useAppStore((state) => state.setUser);
   const logout = useAppStore((state) => state.logout);
-  const [expandedSection, setExpandedSection] = useState<'profile' | 'security' | 'liked' | null>('profile');
+  const [expandedSection, setExpandedSection] = useState<'profile' | 'security' | 'liked' | null>(
+    open === 'profile' ? 'profile' : open === 'liked' ? 'liked' : null
+  );
+
+  const toggleSection = useCallback((section: 'profile' | 'security' | 'liked' | null) => {
+    setExpandedSection((prev) => (prev === section ? null : section));
+  }, []);
   
   // Edit Profile state
   const [name, setName] = useState(user?.fullName || '');
@@ -256,7 +264,7 @@ export default function SettingsScreen() {
           {/* Edit Profile */}
           <TouchableOpacity
             className="flex-row items-center justify-between py-4 border-b border-gray-200"
-            onPress={() => setExpandedSection(expandedSection === 'profile' ? null : 'profile')}
+            onPress={() => toggleSection('profile')}
             activeOpacity={0.7}
           >
             <View className="flex-row items-center">
@@ -270,7 +278,7 @@ export default function SettingsScreen() {
             />
           </TouchableOpacity>
 
-          {expandedSection === 'profile' && (
+          <CollapsibleSection expanded={expandedSection === 'profile'}>
             <View className="pb-6 pt-2">
               <Text className="text-gray-500 text-xs font-medium mb-3 uppercase tracking-wide">Name</Text>
               <TextInput
@@ -297,12 +305,12 @@ export default function SettingsScreen() {
                 )}
               </TouchableOpacity>
             </View>
-          )}
+          </CollapsibleSection>
 
           {/* Security */}
           <TouchableOpacity
             className="flex-row items-center justify-between py-4 border-b border-gray-200"
-            onPress={() => setExpandedSection(expandedSection === 'security' ? null : 'security')}
+            onPress={() => toggleSection('security')}
             activeOpacity={0.7}
           >
             <View className="flex-row items-center">
@@ -316,7 +324,7 @@ export default function SettingsScreen() {
             />
           </TouchableOpacity>
 
-          {expandedSection === 'security' && (
+          <CollapsibleSection expanded={expandedSection === 'security'}>
             <View className="pb-6 pt-2">
               <Text className="text-gray-500 text-xs font-medium mb-3 uppercase tracking-wide">Email</Text>
             <TextInput
@@ -415,12 +423,12 @@ export default function SettingsScreen() {
               )}
             </TouchableOpacity>
             </View>
-          )}
+          </CollapsibleSection>
 
           {/* Liked Events */}
           <TouchableOpacity
             className="flex-row items-center justify-between py-4 border-b border-gray-200"
-            onPress={() => setExpandedSection(expandedSection === 'liked' ? null : 'liked')}
+            onPress={() => toggleSection('liked')}
             activeOpacity={0.7}
           >
             <View className="flex-row items-center">
@@ -437,7 +445,7 @@ export default function SettingsScreen() {
             </View>
           </TouchableOpacity>
 
-          {expandedSection === 'liked' && (
+          <CollapsibleSection expanded={expandedSection === 'liked'}>
             <View className="pb-6 pt-2">
               <Text className="text-gray-600 text-sm mb-3">
                 Choose who can see your liked events on your public profile
@@ -487,17 +495,20 @@ export default function SettingsScreen() {
                 </TouchableOpacity>
               </View>
             </View>
-          )}
+          </CollapsibleSection>
         </View>
 
         {/* Logout */}
-        <TouchableOpacity
-          className="mt-12 py-4 items-center"
-          onPress={handleLogout}
-          activeOpacity={0.7}
-        >
-          <Text className="text-red-600 text-sm font-semibold">Log out</Text>
-        </TouchableOpacity>
+        <View className="mt-12 px-3 pb-8">
+          <TouchableOpacity
+            className="flex-row items-center justify-center gap-2 py-3 rounded-lg border-2 border-red-500 bg-red-50"
+            onPress={handleLogout}
+            activeOpacity={0.7}
+          >
+            <MaterialIcons name="logout" size={20} color="#DC2626" />
+            <Text className="text-red-600 text-base font-semibold">Log out</Text>
+          </TouchableOpacity>
+        </View>
       </ScrollView>
 
       <Modal

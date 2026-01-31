@@ -28,11 +28,11 @@ export interface Event {
   status?: 'pending' | 'approved';
   createdBy?: {
     _id: string;
+    id?: string;
     fullName: string;
     username?: string;
     email: string;
     phone?: string;
-    profileImage?: string | null;
     profileImageUrl?: string | null;
   };
   joinedUsers?: {
@@ -61,12 +61,10 @@ export interface CreateEventRequest {
   organizerName?: string;
   phone?: string;
   gender: 'male' | 'female' | 'all';
-  /** Paid { price: number, currency: 'PKR' } or free { price: 'free', currency: null } */
-  price: EventPrice;
+  /** Backend expects ticketPrice (number): 0 for free, amount for paid */
+  ticketPrice: number;
   /** For paid events; optional for free */
   totalTickets?: number;
-  /** Backward compat: same as price.price when paid, 0 when free */
-  ticketPrice?: number;
 }
 
 export interface UpdateEventRequest {
@@ -80,7 +78,6 @@ export interface UpdateEventRequest {
   phone?: string;
   ticketPrice?: number;
   totalTickets?: number;
-  price?: EventPrice;
   gender?: 'male' | 'female' | 'all';
   organizerName?: string;
 }

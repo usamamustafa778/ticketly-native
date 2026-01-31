@@ -49,8 +49,8 @@ export const EventCard: React.FC<EventCardProps> = ({ event, onPress }) => {
     ? 'Free'
     : `Rs ${priceValue.toLocaleString('en-PK')}`;
 
-  // Prepare attendee avatars (host + joined users)
-  const hostAvatarUrl = event.hostAvatarUrl || event.image;
+  // Prepare attendee avatars (host + joined users). Use host profile image only, never event image.
+  const hostAvatarUrl = event.hostAvatarUrl ?? null;
   const joinedUsers = event.joinedUsers || [];
   const joinedCount = event.joinedCount ?? joinedUsers.length ?? 0;
   const visibleJoined = joinedUsers.slice(0, 3);
@@ -75,7 +75,7 @@ export const EventCard: React.FC<EventCardProps> = ({ event, onPress }) => {
           </Text>
         </View>
         {/* Joined users avatars pill on image (or count when list not loaded) */}
-        {(joinedUsers.length > 0 || joinedCount > 0 || hostAvatarUrl) && (
+        {(joinedUsers.length > 0 || joinedCount > 0) && (
           <View className="absolute bottom-0 h-5 right-[-5px] flex-row items-center translate-y-1/2">
             {/* Joined users: avatars when available, or "X going" pill when only count is known */}
             {joinedUsers.length > 0 ? (
@@ -153,16 +153,17 @@ export const EventCard: React.FC<EventCardProps> = ({ event, onPress }) => {
         </View> */}
 
         {/* Host row (text + avatar). Clickable to open host profile. */}
-        {hostAvatarUrl && (
-          (() => {
-            const ev = event as any;
-            const organizerId = ev.organizerId || ev.createdBy?._id || ev.createdBy?.id || '';
-            const HostContent = () => (
-              <View className="flex-row items-center gap-2">
-                <Image
-                  source={{
-                    uri: hostAvatarUrl || 'https://images.unsplash.com/photo-1470229722913-7c0e2dbbafd3?w=800',
-                  }}
+        {(() => {
+          const ev = event as any;
+          const organizerId = ev.organizerId || ev.createdBy?._id || ev.createdBy?.id || '';
+          const showHostRow = ev.organizerName || ev.createdBy?.fullName || organizerId;
+          if (!showHostRow) return null;
+          const HostContent = () => (
+            <View className="flex-row items-center gap-2">
+              <Image
+                source={{
+                  uri: hostAvatarUrl || 'https://images.unsplash.com/photo-1494797710133-75adf6c1f4a3?w=200',
+                }}
                   className="w-7 h-7 rounded-full border border-[#111827] bg-black/80"
                   resizeMode="cover"
                 />
@@ -190,8 +191,7 @@ export const EventCard: React.FC<EventCardProps> = ({ event, onPress }) => {
                 <HostContent />
               </View>
             );
-          })()
-        )}
+          })()}
       </View>
 
       {/* Joined users drop-up (bottom to middle) */}

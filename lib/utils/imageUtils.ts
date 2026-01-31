@@ -28,9 +28,9 @@ export const getEventImageUrl = (event: { image?: string | null; imageUrl?: stri
  * Helper to get the full URL for a profile image.
  * Uses profileImageUrl from API; rewrites to current API_BASE_URL for dynamic backend switching.
  */
-export const getProfileImageUrl = (user: { profileImage?: string | null; profileImageUrl?: string | null }): string | null => {
+export const getProfileImageUrl = (user: { profileImageUrl?: string | null }): string | null => {
   const baseUrl = API_BASE_URL.replace('/api', '');
-  const urlOrPath = user?.profileImageUrl ?? user?.profileImage;
+  const urlOrPath = user?.profileImageUrl;
   if (!urlOrPath) return null;
 
   let path: string;
