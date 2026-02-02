@@ -7,6 +7,7 @@ import {
   Pressable,
 } from 'react-native';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
+import { modal } from '@/lib/designSystem';
 
 export type ModalVariant = 'default' | 'success' | 'error' | 'info';
 
@@ -70,46 +71,46 @@ export const Modal: React.FC<ModalProps> = ({
       onRequestClose={onClose}
     >
       <Pressable
-        className="flex-1 bg-black/70 justify-center items-center p-5"
+        className={`flex-1 bg-black/70 justify-center items-center ${modal.overlay}`}
         onPress={onClose}
       >
         <Pressable
-          className="bg-white rounded-2xl border border-gray-200 p-6 w-full max-w-[400px]"
+          className={`bg-white rounded-xl border border-gray-200 w-full max-w-[400px] ${modal.container}`}
           onPress={(e) => e.stopPropagation()}
         >
           {showHandle && (
-            <View className="items-center pt-1 pb-3">
-              <View className="w-10 h-1 rounded-full bg-gray-300" />
+            <View className="items-center pt-1 pb-2">
+              <View className="w-8 h-0.5 rounded-full bg-gray-300" />
             </View>
           )}
           {title && (
             <View className="items-center mb-2">
               <View
-                className="w-12 h-12 rounded-full items-center justify-center mb-2"
+                className="w-10 h-10 rounded-full items-center justify-center mb-2"
                 style={{ backgroundColor: style.color + '33' }}
               >
-                <MaterialIcons name={style.icon} size={28} color={style.color} />
+                <MaterialIcons name={style.icon} size={22} color={style.color} />
               </View>
-              <Text className="text-gray-900 text-xl font-bold text-center">{title}</Text>
+              <Text className={`text-gray-900 ${modal.title} font-bold text-center`}>{title}</Text>
             </View>
           )}
           {message != null && message !== '' && (
-            <Text className="text-gray-600 text-base leading-6 mb-6 text-center">{message}</Text>
+            <Text className={`text-gray-600 ${modal.message} leading-5 mb-4 text-center`}>{message}</Text>
           )}
-          <View className="flex-row gap-3">
+          <View className="flex-row gap-2">
             {secondaryButtonText && (
               <TouchableOpacity
-                className="flex-1 py-3.5 rounded-xl items-center bg-gray-100 border border-gray-200"
+                className={`flex-1 ${modal.button} items-center bg-gray-100 border border-gray-200`}
                 onPress={handleSecondaryPress}
               >
-                <Text className="text-gray-900 text-base font-semibold">{secondaryButtonText}</Text>
+                <Text className="text-gray-900 text-xs font-semibold">{secondaryButtonText}</Text>
               </TouchableOpacity>
             )}
             <TouchableOpacity
-              className={`flex-1 py-3.5 rounded-xl items-center ${primaryBg}`}
+              className={`flex-1 ${modal.button} items-center ${primaryBg}`}
               onPress={handlePrimaryPress}
             >
-              <Text className="text-white text-base font-semibold">{primaryButtonText}</Text>
+              <Text className="text-white text-xs font-semibold">{primaryButtonText}</Text>
             </TouchableOpacity>
           </View>
         </Pressable>

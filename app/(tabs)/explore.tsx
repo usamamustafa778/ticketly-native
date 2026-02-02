@@ -2,8 +2,17 @@ import { EventCard } from '@/components/EventCard';
 import { EventCardSkeleton } from '@/components/EventCardSkeleton';
 import { useAppStore } from '@/store/useAppStore';
 import { eventsAPI } from '@/lib/api/events';
+import { CACHE_KEYS, getCached, setCached } from '@/lib/cache';
 import { useRouter } from 'expo-router';
 import React, { useMemo, useState, useEffect, useRef } from 'react';
+import AnimatedReanimated, {
+  useSharedValue,
+  useAnimatedStyle,
+  withRepeat,
+  withSequence,
+  withTiming,
+  cancelAnimation,
+} from 'react-native-reanimated';
 import { getEventImageUrl, getProfileImageUrl } from '@/lib/utils/imageUtils';
 import {
   Animated,
@@ -16,8 +25,10 @@ import {
   Platform,
   RefreshControl,
   ScrollView,
+  Dimensions,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useBottomPadding } from '@/hooks/useBottomPadding';
 import { Modal } from '@/components/Modal';
 import type { Event } from '@/lib/api/events';
 
@@ -67,30 +78,37 @@ export default function ExploreScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [showErrorModal, setShowErrorModal] = useState(false);
   const [errorModalMessage, setErrorModalMessage] = useState('');
+  const [sBackgroundFetching, setIsBackgroundFetching] = useState(false);
+  const loadingLineProgress = useSharedValue(0);
   const lastScrollY = useRef(0);
   const headerTranslateY = useRef(new Animated.Value(0)).current;
 
-  // Calculate bottom padding: tab bar height + safe area bottom + extra padding
-  // Tab bar layout: compact bar with insets.bottom for devices with home indicator / gesture bar
-  const tabBarTotalHeight = Platform.OS === 'ios'
-    ? 56 + Math.max(insets.bottom, 6)
-    : 52 + Math.max(insets.bottom, 6) + 2;
-  const bottomPadding = tabBarTotalHeight + 20; // Extra 20px for comfortable spacing
+  // Dynamic bottom padding: Gestures (insets.bottom > 0) = safe area + 20px; Buttons (insets.bottom === 0) = 10px
+  const bottomPadding = useBottomPadding();
 
   useEffect(() => {
     loadEvents();
   }, []);
 
   const loadEvents = async (showRefreshing = false) => {
-    try {
-      if (showRefreshing) {
-        setRefreshing(true);
-      } else {
-        setLoading(true);
+    // Public data: always try cache first (works for logged-in and logged-out users)
+    let hadCache = false;
+    if (!showRefreshing) {
+      const cached = await getCached<any[]>(CACHE_KEYS.EVENTS_APPROVED);
+      if (cached && Array.isArray(cached) && cached.length > 0) {
+        hadCache = true;
+        setEvents(cached);
+        setLoading(false);
       }
+    }
+    try {
+      if (showRefreshing) setRefreshing(true);
+      else if (!hadCache) setLoading(true);
+      if (hadCache || showRefreshing) setIsBackgroundFetching(true);
       const response = await eventsAPI.getApprovedEvents();
       if (response.success && response.events) {
         const convertedEvents = response.events.map(convertEvent);
+        await setCached(CACHE_KEYS.EVENTS_APPROVED, convertedEvents);
         setEvents(convertedEvents);
       }
     } catch (error: any) {
@@ -99,8 +117,31 @@ export default function ExploreScreen() {
     } finally {
       setLoading(false);
       setRefreshing(false);
+      setIsBackgroundFetching(false);
     }
   };
+
+  // Animated loading line - below top bar when cached/refreshing
+  useEffect(() => {
+    if (!sBackgroundFetching) {
+      cancelAnimation(loadingLineProgress);
+      loadingLineProgress.value = 0;
+      return;
+    }
+    loadingLineProgress.value = withRepeat(
+      withSequence(
+        withTiming(1, { duration: 1200 }),
+        withTiming(0, { duration: 0 })
+      ),
+      -1
+    );
+    return () => cancelAnimation(loadingLineProgress);
+  }, [sBackgroundFetching, loadingLineProgress]);
+
+  const screenWidth = Dimensions.get('window').width;
+  const loadingLineAnimatedStyle = useAnimatedStyle(() => ({
+    width: loadingLineProgress.value * screenWidth * 0.4,
+  }));
 
   const onRefresh = () => {
     loadEvents(true);
@@ -152,19 +193,38 @@ export default function ExploreScreen() {
         }}
       >
         <View
-          className="bg-white border-b border-gray-200"
+          className="bg-white border-b border-gray-200 overflow-hidden"
           style={{ paddingTop: safeTop }}
         >
-          {/* Filters at top of page */}
-          <View className="px-3 pb-4">
+          {/* Search at top of page */}
+          <View className="px-3 pb-1">
             <TextInput
-              className="bg-gray-50 border border-gray-200 rounded-xl py-3 px-4 text-gray-900 text-sm"
+              className="bg-gray-50 border border-gray-200 rounded-md py-0.5 px-4 text-gray-900 text-sm"
               placeholder="Search by event..."
               placeholderTextColor="#6B7280"
               value={searchQuery}
               onChangeText={setSearchQuery}
             />
           </View>
+          {/* Loading bar at bottom of top bar - when cached data + API running or pull-to-refresh */}
+          {sBackgroundFetching && (
+            <View style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: 2, backgroundColor: '#E5E7EB', zIndex: 1, overflow: 'hidden' }}>
+              <AnimatedReanimated.View
+                style={[
+                  {
+                    position: 'absolute',
+                    left: 0,
+                    top: 0,
+                    height: 2,
+                    backgroundColor: '#DC2626',
+                    zIndex: 10,
+                    ...(Platform.OS === 'android' && { elevation: 5 }),
+                  },
+                  loadingLineAnimatedStyle,
+                ]}
+              />
+            </View>
+          )}
         </View>
       </Animated.View>
 
@@ -200,7 +260,7 @@ export default function ExploreScreen() {
           data={filteredEvents}
           style={{ flex: 1 }}
           contentContainerStyle={{
-            paddingTop: headerHeight,
+            paddingTop: headerHeight - 20,
             paddingHorizontal: 2,
             paddingBottom: bottomPadding,
           }}

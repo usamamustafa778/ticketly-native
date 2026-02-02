@@ -1,5 +1,7 @@
 import { EventCard } from '@/components/EventCard';
 import { EventCardSkeleton } from '@/components/EventCardSkeleton';
+import { ButtonPrimary } from '@/components/ui/ButtonPrimary';
+import { TabsRow } from '@/components/ui/Tabs';
 import { authAPI, PROFILE_CACHE_KEY } from '@/lib/api/auth';
 import { eventsAPI } from '@/lib/api/events';
 import { API_BASE_URL } from '@/lib/config';
@@ -12,6 +14,7 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { getEventImageUrl, getProfileImageUrl } from '@/lib/utils/imageUtils';
 import {
   ActivityIndicator,
+  FlatList,
   Image,
   Modal as RNModal,
   PanResponder,
@@ -25,6 +28,7 @@ import {
 } from 'react-native';
 import { Modal } from '@/components/Modal';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useBottomPadding } from '@/hooks/useBottomPadding';
 
 // Token storage keys (must match client.ts)
 const ACCESS_TOKEN_KEY = 'accessToken';
@@ -94,12 +98,8 @@ export default function ProfileScreen() {
   const hasLoadedRef = useRef(false);
   const currentUserIdRef = useRef<string | null>(null);
 
-  // Calculate bottom padding: tab bar height + safe area bottom + extra padding
-  // Tab bar layout: compact bar with insets.bottom for devices with home indicator / gesture bar
-  const tabBarTotalHeight = Platform.OS === 'ios'
-    ? 56 + Math.max(insets.bottom, 6)
-    : 52 + Math.max(insets.bottom, 6) + 2;
-  const bottomPadding = tabBarTotalHeight + 20; // Extra 20px for comfortable spacing
+  // Dynamic bottom padding: Gestures (insets.bottom > 0) = safe area + 20px; Buttons (insets.bottom === 0) = 10px
+  const bottomPadding = useBottomPadding();
 
   const TAB_ORDER: ('created' | 'joined' | 'liked')[] = ['created', 'joined', 'liked'];
   const activeTabRef = useRef(activeTab);
@@ -417,6 +417,34 @@ export default function ProfileScreen() {
     }
   };
 
+  // Use myEvents directly as created events (they're already filtered by the API)
+  const createdEvents = myEvents;
+
+  // FlatList data: loading skeletons or events based on activeTab (must be before early returns - hooks rule)
+  const profileFlatListData = React.useMemo(() => {
+    if (loading) {
+      return Array.from({ length: 6 }, (_, i) => ({ id: `skeleton-${i}`, _skeleton: true } as any));
+    }
+    if (activeTab === 'joined') {
+      return joinedEventsData.map((jd, idx) => {
+        const ev = convertEvent(jd.event);
+        return { ...ev, id: ev.id || `event-${idx}`, _tab: 'joined' as const };
+      });
+    }
+    if (activeTab === 'created') {
+      return createdEvents.map((e) => ({
+        ...e,
+        id: e.id || e._id || (e as any)?._id || (e as any)?.id,
+        _tab: 'created' as const,
+      }));
+    }
+    return likedEvents.map((e) => ({
+      ...e,
+      id: e.id || e._id || (e as any)?._id || (e as any)?.id,
+      _tab: 'liked' as const,
+    }));
+  }, [loading, activeTab, joinedEventsData, createdEvents, likedEvents]);
+
   // Show loading only while we check cache (so we don't flash "Login" when user is actually logged in)
   if (!user && !hasCheckedCache) {
     return (
@@ -441,20 +469,17 @@ export default function ProfileScreen() {
             <Text className="text-gray-600 text-base mb-8 text-center leading-6">
               Login to create events, register for events, and manage your profile
             </Text>
-            <TouchableOpacity
-              className="bg-primary py-4 px-8 rounded-xl"
+            <ButtonPrimary
+              size="lg"
               onPress={() => router.push('/login')}
             >
-              <Text className="text-white text-base font-semibold">Login / Sign Up</Text>
-            </TouchableOpacity>
+              Login / Sign Up
+            </ButtonPrimary>
           </View>
         </ScrollView>
       </View>
     );
   }
-
-  // Use myEvents directly as created events (they're already filtered by the API)
-  const createdEvents = myEvents;
 
   const handleLogout = () => {
     console.log('🔴 Logout button clicked!');
@@ -565,105 +590,41 @@ export default function ProfileScreen() {
     }
   };
 
-  const renderEvents = () => {
-    if (loading) {
+  const renderProfileEventCard = ({ item }: { item: any }) => {
+    if (item._skeleton) {
       return (
-        <View className="grid grid-cols-2 flex-row flex-wrap px-[2px]" style={{ gap: 2 }}>
-          {[1, 2, 3, 4, 5, 6].map((i) => (
-            <View key={i} className="flex-[0_0_49%]">
-              <EventCardSkeleton />
-            </View>
-          ))}
+        <View className="flex-1">
+          <EventCardSkeleton />
         </View>
       );
     }
-
-    if (activeTab === 'joined') {
-      if (joinedEventsData.length === 0) {
-        return (
-          <TouchableOpacity
-            className="px-3 py-10 items-center"
-            onPress={onRefresh}
-            activeOpacity={0.7}
-          >
-            <Text className="text-[#6B7280] text-sm">No events joined yet</Text>
-          </TouchableOpacity>
-        );
+    const eventId = item.id || item._id;
+    const onPress = () => {
+      if (!eventId) return;
+      if (item._tab === 'created') {
+        router.push(`/created-event-details/${eventId}`);
+      } else {
+        router.push(`/event-details/${eventId}`);
       }
-
-      return (
-        <View className="grid grid-cols-2 flex-row flex-wrap px-[2px]" style={{ gap: 2 }}>
-          {joinedEventsData.map((joinedEventData, index) => {
-            const event = convertEvent(joinedEventData.event);
-            const eventId = event.id || `event-${index}`;
-            return (
-              <View key={eventId} className="flex-[0_0_49%]">
-                <EventCard
-                  event={event}
-                  onPress={() => eventId && router.push(`/event-details/${eventId}`)}
-                />
-              </View>
-            );
-          })}
-        </View>
-      );
-    }
-
-    let eventsToShow: any[] = [];
-    if (activeTab === 'created') eventsToShow = createdEvents;
-    else eventsToShow = likedEvents;
-
-    if (eventsToShow.length === 0) {
-      return (
-        <TouchableOpacity
-          className="px-3 py-10 items-center"
-          onPress={onRefresh}
-          activeOpacity={0.7}
-        >
-          <Text className="text-[#6B7280] text-sm">
-            {activeTab === 'created' ? 'No events created yet' : 'No events liked yet'}
-          </Text>
-        </TouchableOpacity>
-      );
-    }
-
+    };
     return (
-      <View className="grid grid-cols-2 flex-row flex-wrap px-[2px]" style={{ gap: 2 }}>
-        {eventsToShow.map((event) => {
-          // Ensure event ID is valid before rendering
-          const eventId = event.id || event._id || (event as any)?._id || (event as any)?.id;
-
-          if (!eventId) {
-            console.warn('⚠️ Event missing ID, skipping navigation:', event);
-            return null;
-          }
-
-          return (
-            <View key={eventId} className="flex-[0_0_49%]">
-              <EventCard
-                event={event}
-                onPress={() => {
-                  if (activeTab === 'created') {
-                    router.push(`/created-event-details/${eventId}`);
-                  } else {
-                    router.push(`/event-details/${eventId}`);
-                  }
-                }}
-              />
-            </View>
-          );
-        })}
+      <View className="flex-1">
+        <EventCard event={item} onPress={onPress} />
       </View>
     );
   };
 
   return (
-    <View className="flex-1 bg-white pt-[60px]" {...panResponder.panHandlers}>
-      <ScrollView
-        className="flex-1"
-        contentContainerStyle={{ paddingBottom: bottomPadding }}
-        showsVerticalScrollIndicator={false}
-        stickyHeaderIndices={[3]}
+    <View className="flex-1 bg-white" {...panResponder.panHandlers}>
+      <FlatList
+        key={activeTab}
+        data={profileFlatListData}
+        style={{ flex: 1 }}
+        contentContainerStyle={{ paddingTop: insets.top + 10, paddingBottom: bottomPadding, paddingHorizontal: 2 }}
+        keyExtractor={(item) => item.id}
+        numColumns={2}
+        columnWrapperStyle={{ gap: 2, marginBottom: 2 }}
+        renderItem={renderProfileEventCard}
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
@@ -672,117 +633,121 @@ export default function ProfileScreen() {
             colors={["#DC2626"]}
           />
         }
-      >
-        {/* Profile Header */}
-        <View className="flex-row justify-end items-center px-3 pt-5 pb-2">
-          <TouchableOpacity
-            className="bg-gray-100 w-10 h-10 rounded-lg items-center justify-center"
-            onPress={() => router.push('/settings')}
-          >
-            <MaterialIcons name="menu" size={24} color="#111827" />
-          </TouchableOpacity>
-        </View>
+        ListHeaderComponent={
+          <>
+            {/* Profile Header */}
+            <View className="flex-row justify-end items-center px-3 pb-2">
+              <TouchableOpacity
+                className="bg-gray-100 w-10 h-10 rounded-lg items-center justify-center"
+                onPress={() => router.push('/settings')}
+              >
+                <MaterialIcons name="menu" size={24} color="#111827" />
+              </TouchableOpacity>
+            </View>
 
-        {/* Profile Section - Centered */}
-        <View className="items-center py-6 pb-4">
-          <View className="relative">
-            <TouchableOpacity
-              onPress={() => setShowImageViewer(true)}
-              activeOpacity={0.8}
-              disabled={uploadingImage}
-              className="w-[100px] h-[100px] rounded-full overflow-hidden"
-            >
-              <View className="w-full h-full rounded-full bg-primary items-center justify-center overflow-hidden">
-                {profileImageUrl ? (
-                  <Image
-                    source={{ uri: profileImageUrl }}
-                    className="w-full h-full"
-                    resizeMode="cover"
-                  />
-                ) : (
-                  <Text className="text-white text-4xl font-bold">
-                    {user.fullName.charAt(0).toUpperCase()}
-                  </Text>
-                )}
+            {/* Profile Section - Centered */}
+            <View className="items-center py-6 pb-4">
+              <View className="relative">
+                <TouchableOpacity
+                  onPress={() => setShowImageViewer(true)}
+                  activeOpacity={0.8}
+                  disabled={uploadingImage}
+                  className="w-[100px] h-[100px] rounded-full overflow-hidden"
+                >
+                  <View className="w-full h-full rounded-full bg-primary items-center justify-center overflow-hidden">
+                    {profileImageUrl ? (
+                      <Image
+                        source={{ uri: profileImageUrl }}
+                        className="w-full h-full"
+                        resizeMode="cover"
+                      />
+                    ) : (
+                      <Text className="text-white text-4xl font-bold">
+                        {user.fullName.charAt(0).toUpperCase()}
+                      </Text>
+                    )}
+                  </View>
+                  {uploadingImage && (
+                    <View className="absolute inset-0 bg-black/50 rounded-full items-center justify-center">
+                      <ActivityIndicator size="small" color="#DC2626" />
+                    </View>
+                  )}
+                </TouchableOpacity>
+                <TouchableOpacity
+                  onPress={pickImage}
+                  disabled={uploadingImage}
+                  activeOpacity={0.8}
+                  className="absolute bottom-0 right-0 bg-primary w-8 h-8 rounded-full items-center justify-center border-2 border-white"
+                >
+                  <MaterialIcons name="camera-alt" size={16} color="#FFFFFF" />
+                </TouchableOpacity>
               </View>
-              {uploadingImage && (
-                <View className="absolute inset-0 bg-black/50 rounded-full items-center justify-center">
-                  <ActivityIndicator size="small" color="#DC2626" />
-                </View>
+              <TouchableOpacity
+                className="flex-row items-center gap-2 mb-1"
+                onPress={() => router.push('/settings?open=profile')}
+                activeOpacity={0.7}
+              >
+                <Text className="text-gray-900 text-2xl font-bold">{user.fullName}</Text>
+                <MaterialIcons name="edit" size={20} color="#DC2626" />
+              </TouchableOpacity>
+              {user.companyName && (
+                <Text className="text-primary text-base font-semibold mt-1">{user.companyName}</Text>
               )}
-            </TouchableOpacity>
+              {user.username && (
+                <Text className="text-gray-500 text-sm text-center">@{user.username}</Text>
+              )}
+            </View>
+            {/* Stats */}
+            {/* <View className="flex-row justify-around px-16 py-2">
+              <View className="items-center">
+                <Text className="text-gray-900 text-base font-bold mb-0.5">{createdEvents.length}</Text>
+                <Text className="text-[#9CA3AF] text-[10px]">Created</Text>
+              </View>
+              <View className="items-center">
+                <Text className="text-gray-900 text-base font-bold mb-0.5">{joinedEventsData.length}</Text>
+                <Text className="text-[#9CA3AF] text-[10px]">Joined</Text>
+              </View>
+              <View className="items-center">
+                <Text className="text-gray-900 text-base font-bold mb-0.5">{likedEvents.length}</Text>
+                <Text className="text-[#9CA3AF] text-[10px]">Liked</Text>
+              </View>
+            </View> */}
+
+            {/* Tabs */}
+            <View className="mx-10 ">
+              <View className="py-2 translate-y-[-2px] bg-white">
+                <TabsRow
+                  items={[
+                    { key: 'created', label: 'Created Events' },
+                    { key: 'joined', label: 'Joined Events' },
+                    { key: 'liked', label: 'Liked Events' },
+                  ]}
+                  activeKey={activeTab}
+                  onSelect={setActiveTab}
+                />
+              </View>
+            </View>
+          </>
+        }
+        ListEmptyComponent={
+          !loading ? (
             <TouchableOpacity
-              onPress={pickImage}
-              disabled={uploadingImage}
-              activeOpacity={0.8}
-              className="absolute bottom-0 right-0 bg-primary w-8 h-8 rounded-full items-center justify-center border-2 border-white"
+              className="px-3 py-10  items-center"
+              onPress={onRefresh}
+              activeOpacity={0.7}
             >
-              <MaterialIcons name="camera-alt" size={16} color="#FFFFFF" />
+              <Text className="text-[#6B7280] text-sm">
+                {activeTab === 'joined'
+                  ? 'No events joined yet'
+                  : activeTab === 'created'
+                    ? 'No events created yet'
+                    : 'No events liked yet'}
+              </Text>
             </TouchableOpacity>
-          </View>
-          <TouchableOpacity
-            className="flex-row items-center gap-2 mb-1"
-            onPress={() => router.push('/settings?open=profile')}
-            activeOpacity={0.7}
-          >
-            <Text className="text-gray-900 text-2xl font-bold">{user.fullName}</Text>
-            <MaterialIcons name="edit" size={20} color="#DC2626" />
-          </TouchableOpacity>
-          {user.companyName && (
-            <Text className="text-primary text-base font-semibold mt-1">{user.companyName}</Text>
-          )}
-        </View>
-
-        {/* Stats */}
-        <View className="flex-row justify-around px-16 py-2">
-
-          <View className="items-center">
-            <Text className="text-gray-900 text-base font-bold mb-0.5">{createdEvents.length}</Text>
-            <Text className="text-[#9CA3AF] text-[10px]">Created</Text>
-          </View>
-          <View className="items-center">
-            <Text className="text-gray-900 text-base font-bold mb-0.5">{joinedEventsData.length}</Text>
-            <Text className="text-[#9CA3AF] text-[10px]">Joined</Text>
-          </View>
-          <View className="items-center">
-            <Text className="text-gray-900 text-base font-bold mb-0.5">{likedEvents.length}</Text>
-            <Text className="text-[#9CA3AF] text-[10px]">Liked</Text>
-          </View>
-        </View>
-
-        {/* Tabs - sticky when scrolling */}
-        <View className="flex-row px-16 py-2 mb-3 translate-y-[-2px] gap-2 bg-white">
-          <TouchableOpacity
-            className={`flex-1 py-2 items-center rounded-md ${activeTab === 'created' ? 'bg-primary' : 'bg-gray-100'}`}
-            onPress={() => setActiveTab('created')}
-          >
-            <Text className={`text-[10px] font-semibold ${activeTab === 'created' ? 'text-white' : 'text-[#9CA3AF]'}`}>
-              Created Events
-            </Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            className={`flex-1 py-2 items-center rounded-md ${activeTab === 'joined' ? 'bg-primary' : 'bg-gray-100'}`}
-            onPress={() => setActiveTab('joined')}
-          >
-            <Text className={`text-[10px] font-semibold ${activeTab === 'joined' ? 'text-white' : 'text-[#9CA3AF]'}`}>
-              Joined Events
-            </Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            className={`flex-1 py-2 items-center rounded-md ${activeTab === 'liked' ? 'bg-primary' : 'bg-gray-100'}`}
-            onPress={() => setActiveTab('liked')}
-          >
-            <Text className={`text-[10px] font-semibold ${activeTab === 'liked' ? 'text-white' : 'text-[#9CA3AF]'}`}>
-              Liked Events
-            </Text>
-          </TouchableOpacity>
-        </View>
-
-
-        {/* Events List - swipe area for tab change */}
-        <View className="mb-8">
-          {renderEvents()}
-          {activeTab === 'liked' && (
+          ) : null
+        }
+        ListFooterComponent={
+          activeTab === 'liked' ? (
             <View className="flex-row items-center justify-center gap-2 px-4 py-6">
               <Text className="text-[#6B7280] text-sm text-center flex-1">
                 Choose who can see your liked events on your public profile
@@ -795,9 +760,9 @@ export default function ProfileScreen() {
                 <MaterialIcons name="edit" size={18} color="#DC2626" />
               </TouchableOpacity>
             </View>
-          )}
-        </View>
-      </ScrollView>
+          ) : null
+        }
+      />
 
       <Modal
         visible={showPermissionModal}

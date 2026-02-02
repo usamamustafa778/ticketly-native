@@ -2,7 +2,6 @@ import React, { useState, useCallback, useEffect } from 'react';
 import {
   View,
   Text,
-  TextInput,
   TouchableOpacity,
   ScrollView,
   KeyboardAvoidingView,
@@ -11,9 +10,14 @@ import {
   RefreshControl,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { BackButton } from '@/components/BackButton';
 import { CollapsibleSection } from '@/components/CollapsibleSection';
 import { Modal } from '@/components/Modal';
+import { ButtonPrimary } from '@/components/ui/ButtonPrimary';
+import { DataInput } from '@/components/ui/DataInput';
+import { DataSelection } from '@/components/ui/DataSelection';
+import { Icon } from '@/components/ui/Icon';
 import { useAppStore } from '@/store/useAppStore';
 import { authAPI } from '@/lib/api/auth';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
@@ -25,6 +29,7 @@ const REFRESH_TOKEN_KEY = 'refreshToken';
 
 export default function SettingsScreen() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const { open } = useLocalSearchParams<{ open?: string }>();
   const user = useAppStore((state) => state.user);
   const setUser = useAppStore((state) => state.setUser);
@@ -240,6 +245,22 @@ export default function SettingsScreen() {
       className="flex-1 bg-white"
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
+      {/* Fixed header - back button stays on top when scrolling */}
+      <View
+        style={{
+          paddingTop: insets.top + 8,
+          paddingBottom: 12,
+          paddingHorizontal: 12,
+          flexDirection: 'row',
+          alignItems: 'center',
+          borderBottomWidth: 1,
+          borderBottomColor: '#E5E7EB',
+          backgroundColor: '#FFFFFF',
+        }}
+      >
+        <BackButton onPress={() => router.back()} className="-ml-2" />
+        <Text className="flex-1 text-gray-900 text-lg font-semibold text-center mr-8">Settings</Text>
+      </View>
       <ScrollView
         className="flex-1"
         contentContainerStyle={{ paddingBottom: 40 }}
@@ -253,12 +274,6 @@ export default function SettingsScreen() {
           />
         }
       >
-        {/* Header */}
-        <View className="flex-row items-center pt-[60px] px-3 pb-4 border-b border-gray-200">
-          <BackButton onPress={() => router.back()} className="-ml-2" />
-          <Text className="flex-1 text-gray-900 text-lg font-semibold text-center mr-8">Settings</Text>
-        </View>
-
         {/* List */}
         <View className="px-3 pt-4">
           {/* Edit Profile */}
@@ -280,30 +295,26 @@ export default function SettingsScreen() {
 
           <CollapsibleSection expanded={expandedSection === 'profile'}>
             <View className="pb-6 pt-2">
-              <Text className="text-gray-500 text-xs font-medium mb-3 uppercase tracking-wide">Name</Text>
-              <TextInput
-                className={`bg-gray-50 border rounded-lg py-3 px-4 text-gray-900 text-base mb-2 ${nameError ? 'border-red-500' : 'border-gray-200'}`}
+              <DataInput
+                label="Name"
                 placeholder="Full name"
-                placeholderTextColor="#9CA3AF"
                 value={name}
                 onChangeText={(text) => {
                   setName(text);
                   if (nameError) setNameError('');
                 }}
+                error={nameError}
                 autoCapitalize="words"
+                className="mb-4"
               />
-              {nameError ? <Text className="text-red-500 text-xs mb-4">{nameError}</Text> : null}
-              <TouchableOpacity
-                className={`bg-gray-900 py-3 rounded-lg items-center ${loadingName ? 'opacity-60' : ''}`}
-                onPress={handleUpdateName}
+              <ButtonPrimary
+                loading={loadingName}
                 disabled={loadingName}
+                onPress={handleUpdateName}
+                size="md"
               >
-                {loadingName ? (
-                  <ActivityIndicator color="#FFFFFF" size="small" />
-                ) : (
-                  <Text className="text-white text-sm font-semibold">Update Name</Text>
-                )}
-              </TouchableOpacity>
+                Update Name
+              </ButtonPrimary>
             </View>
           </CollapsibleSection>
 
@@ -325,76 +336,65 @@ export default function SettingsScreen() {
           </TouchableOpacity>
 
           <CollapsibleSection expanded={expandedSection === 'security'}>
-            <View className="pb-6 pt-2">
-              <Text className="text-gray-500 text-xs font-medium mb-3 uppercase tracking-wide">Email</Text>
-            <TextInput
-              className={`bg-gray-50 border rounded-lg py-3 px-4 text-gray-900 text-base mb-2 ${emailError ? 'border-red-500' : 'border-gray-200'}`}
-              placeholder="Email"
-              placeholderTextColor="#9CA3AF"
-              value={email}
-              onChangeText={(text) => {
-                setEmail(text);
-                if (emailError) setEmailError('');
-              }}
-              keyboardType="email-address"
-              autoCapitalize="none"
-            />
-            {emailError ? <Text className="text-red-500 text-xs mb-4">{emailError}</Text> : null}
-            <TouchableOpacity
-              className={`bg-gray-900 py-3 rounded-lg items-center mb-8 ${loadingEmail ? 'opacity-60' : ''}`}
-              onPress={handleUpdateEmail}
-              disabled={loadingEmail}
-            >
-              {loadingEmail ? (
-                <ActivityIndicator color="#FFFFFF" size="small" />
-              ) : (
-                <Text className="text-white text-sm font-semibold">Update Email</Text>
-              )}
-            </TouchableOpacity>
+            <View className="pb-6  pt-2">
+              <DataInput
+                label="Email"
+                placeholder="Email"
+                value={email}
+                onChangeText={(text) => {
+                  setEmail(text);
+                  if (emailError) setEmailError('');
+                }}
+                error={emailError}
+                keyboardType="email-address"
+                autoCapitalize="none"
+                className="mb-4"
+              />
+              <ButtonPrimary
+                loading={loadingEmail}
+                disabled={loadingEmail}
+                onPress={handleUpdateEmail}
+                className="mb-8"
+                size="md"
+              >
+                Update Email
+              </ButtonPrimary>
 
-            <Text className="text-gray-500 text-xs font-medium mb-3 uppercase tracking-wide">Password</Text>
-            <View className="relative mb-3">
-              <TextInput
-                className="bg-gray-50 border border-gray-200 rounded-lg py-3 px-4 pr-12 text-gray-900 text-base"
+              <DataInput
+                label="Current password"
                 placeholder="Current password"
-                placeholderTextColor="#9CA3AF"
                 value={currentPassword}
                 onChangeText={setCurrentPassword}
                 secureTextEntry={!showCurrentPassword}
                 autoCapitalize="none"
+                rightElement={
+                  <TouchableOpacity onPress={() => setShowCurrentPassword(!showCurrentPassword)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                    <Icon name={showCurrentPassword ? 'visibility' : 'visibility-off'} size="lg" color="#9CA3AF" />
+                  </TouchableOpacity>
+                }
+                className="mb-3"
               />
-              <TouchableOpacity
-                className="absolute right-3 top-3 p-1"
-                onPress={() => setShowCurrentPassword(!showCurrentPassword)}
-              >
-                <MaterialIcons name={showCurrentPassword ? "visibility" : "visibility-off"} size={20} color="#9CA3AF" />
-              </TouchableOpacity>
-            </View>
-            <View className="relative mb-3">
-              <TextInput
-                className={`bg-gray-50 border rounded-lg py-3 px-4 pr-12 text-gray-900 text-base ${passwordError ? 'border-red-500' : 'border-gray-200'}`}
+              <DataInput
+                label="New password"
                 placeholder="New password"
-                placeholderTextColor="#9CA3AF"
                 value={newPassword}
                 onChangeText={(text) => {
                   setNewPassword(text);
                   if (passwordError) setPasswordError('');
                 }}
+                error={passwordError}
                 secureTextEntry={!showNewPassword}
                 autoCapitalize="none"
+                rightElement={
+                  <TouchableOpacity onPress={() => setShowNewPassword(!showNewPassword)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                    <Icon name={showNewPassword ? 'visibility' : 'visibility-off'} size="lg" color="#9CA3AF" />
+                  </TouchableOpacity>
+                }
+                className="mb-3"
               />
-              <TouchableOpacity
-                className="absolute right-3 top-3 p-1"
-                onPress={() => setShowNewPassword(!showNewPassword)}
-              >
-                <MaterialIcons name={showNewPassword ? "visibility" : "visibility-off"} size={20} color="#9CA3AF" />
-              </TouchableOpacity>
-            </View>
-            <View className="relative mb-3">
-              <TextInput
-                className={`bg-gray-50 border rounded-lg py-3 px-4 pr-12 text-gray-900 text-base ${passwordError ? 'border-red-500' : 'border-gray-200'}`}
+              <DataInput
+                label="Confirm new password"
                 placeholder="Confirm new password"
-                placeholderTextColor="#9CA3AF"
                 value={confirmPassword}
                 onChangeText={(text) => {
                   setConfirmPassword(text);
@@ -402,26 +402,21 @@ export default function SettingsScreen() {
                 }}
                 secureTextEntry={!showConfirmPassword}
                 autoCapitalize="none"
+                rightElement={
+                  <TouchableOpacity onPress={() => setShowConfirmPassword(!showConfirmPassword)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                    <Icon name={showConfirmPassword ? 'visibility' : 'visibility-off'} size="lg" color="#9CA3AF" />
+                  </TouchableOpacity>
+                }
+                className="mb-4"
               />
-              <TouchableOpacity
-                className="absolute right-3 top-3 p-1"
-                onPress={() => setShowConfirmPassword(!showConfirmPassword)}
+              <ButtonPrimary
+                loading={loadingPassword}
+                disabled={loadingPassword}
+                onPress={handleUpdatePassword}
+                size="md"
               >
-                <MaterialIcons name={showConfirmPassword ? "visibility" : "visibility-off"} size={20} color="#9CA3AF" />
-              </TouchableOpacity>
-            </View>
-            {passwordError ? <Text className="text-red-500 text-xs mb-4">{passwordError}</Text> : null}
-            <TouchableOpacity
-              className={`bg-gray-900 py-3 rounded-lg items-center ${loadingPassword ? 'opacity-60' : ''}`}
-              onPress={handleUpdatePassword}
-              disabled={loadingPassword}
-            >
-              {loadingPassword ? (
-                <ActivityIndicator color="#FFFFFF" size="small" />
-              ) : (
-                <Text className="text-white text-sm font-semibold">Update Password</Text>
-              )}
-            </TouchableOpacity>
+                Update Password
+              </ButtonPrimary>
             </View>
           </CollapsibleSection>
 
@@ -447,53 +442,24 @@ export default function SettingsScreen() {
 
           <CollapsibleSection expanded={expandedSection === 'liked'}>
             <View className="pb-6 pt-2">
-              <Text className="text-gray-600 text-sm mb-3">
-                Choose who can see your liked events on your public profile
-              </Text>
-              <View className="flex-row gap-2">
-                <TouchableOpacity
-                  className={`flex-1 py-3 rounded-lg items-center border ${likedEventsVisibility === 'public' ? 'bg-primary border-primary' : 'bg-gray-50 border-gray-200'}`}
-                  onPress={async () => {
-                    if (likedEventsVisibility === 'public') return;
-                    setLoadingLikedVisibility(true);
-                    try {
-                      const res = await authAPI.updateUser({ likedEventsVisibility: 'public' });
-                      if (res.success && res.user) {
-                        setUser(res.user);
-                        setLikedEventsVisibility('public');
-                      }
-                    } finally {
-                      setLoadingLikedVisibility(false);
+              <DataSelection<'public' | 'private'>
+                label="Who can see your liked events"
+                value={likedEventsVisibility}
+                onSelect={(value) => {
+                  setLoadingLikedVisibility(true);
+                  authAPI.updateUser({ likedEventsVisibility: value }).then((res) => {
+                    if (res.success && res.user) {
+                      setUser(res.user);
+                      setLikedEventsVisibility(value);
                     }
-                  }}
-                  disabled={loadingLikedVisibility}
-                >
-                  <Text className={`text-sm font-semibold ${likedEventsVisibility === 'public' ? 'text-white' : 'text-gray-600'}`}>
-                    Public
-                  </Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  className={`flex-1 py-3 rounded-lg items-center border ${likedEventsVisibility === 'private' ? 'bg-gray-900 border-gray-900' : 'bg-gray-50 border-gray-200'}`}
-                  onPress={async () => {
-                    if (likedEventsVisibility === 'private') return;
-                    setLoadingLikedVisibility(true);
-                    try {
-                      const res = await authAPI.updateUser({ likedEventsVisibility: 'private' });
-                      if (res.success && res.user) {
-                        setUser(res.user);
-                        setLikedEventsVisibility('private');
-                      }
-                    } finally {
-                      setLoadingLikedVisibility(false);
-                    }
-                  }}
-                  disabled={loadingLikedVisibility}
-                >
-                  <Text className={`text-sm font-semibold ${likedEventsVisibility === 'private' ? 'text-white' : 'text-gray-600'}`}>
-                    Private
-                  </Text>
-                </TouchableOpacity>
-              </View>
+                  }).finally(() => setLoadingLikedVisibility(false));
+                }}
+                options={[
+                  { value: 'public', label: 'Public' },
+                  { value: 'private', label: 'Private' },
+                ]}
+                disabled={loadingLikedVisibility}
+              />
             </View>
           </CollapsibleSection>
         </View>

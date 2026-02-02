@@ -3,6 +3,25 @@ import { Platform } from 'react-native';
 import { API_BASE_URL } from '../config';
 import { getAccessToken } from './client';
 
+/** Background pattern styles */
+export type BackgroundElement =
+  | 'none' | 'organic' | 'fluid' | 'grid' | 'geometric' | 'mesh' | 'gradient_mesh' | 'vector' | 'dynamic';
+
+/** Pattern weight: sharper (thinnest) to thicker (boldest) */
+export type PatternWeight = 'sharper' | 'sharp' | 'thin' | 'medium' | 'thick' | 'thicker';
+
+/** Ticket theme - dynamic colors for event tickets */
+export interface TicketTheme {
+  gradientStart: string;
+  gradientEnd: string;
+  primaryTextColor: string;
+  accentColor: string;
+  brandColor: string;
+  gradientDirection?: string;
+  backgroundElement?: BackgroundElement;
+  patternWeight?: PatternWeight;
+}
+
 /** Price: paid { price: number, currency: string } or free { price: 'free', currency: null } */
 export type EventPrice =
   | { price: number; currency: string }
@@ -26,6 +45,7 @@ export interface Event {
   gender?: 'male' | 'female' | 'all';
   organizerName?: string;
   status?: 'pending' | 'approved';
+  ticketTheme?: TicketTheme;
   createdBy?: {
     _id: string;
     id?: string;
@@ -80,6 +100,7 @@ export interface UpdateEventRequest {
   totalTickets?: number;
   gender?: 'male' | 'female' | 'all';
   organizerName?: string;
+  ticketTheme?: TicketTheme;
 }
 
 export interface EventsResponse {

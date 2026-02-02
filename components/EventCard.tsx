@@ -3,6 +3,7 @@ import { View, Text, TouchableOpacity, Image, Modal, Pressable, ScrollView, Dime
 import { Event } from '@/data/mockData';
 import { useRouter } from 'expo-router';
 import { getEventImageUrl } from '@/lib/utils/imageUtils';
+import { Label } from '@/components/ui/Label';
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 const DROPUP_HEIGHT = Math.min(SCREEN_HEIGHT * 0.5, 400);
@@ -69,10 +70,10 @@ export const EventCard: React.FC<EventCardProps> = ({ event, onPress }) => {
           resizeMode="cover"
         />
         {/* Price pill (e.g. Free / Rs 500) */}
-        <View className="absolute bottom-2 left-3 bg-black/80 rounded-full px-3 py-1 ">
-          <Text className="text-white text-[11px] font-semibold">
+        <View className="absolute bottom-2 left-3">
+          <Label variant={isFree ? 'neutral' : 'primary'} small>
             {priceLabel}
-          </Text>
+          </Label>
         </View>
         {/* Joined users avatars pill on image (or count when list not loaded) */}
         {(joinedUsers.length > 0 || joinedCount > 0) && (

@@ -58,14 +58,24 @@ export default function RootLayout() {
   return (
     <ErrorBoundary>
       <ThemeProvider value={navigationTheme}>
-        <Stack screenOptions={{ headerShown: false }} initialRouteName="(tabs)">
+        <Stack
+          screenOptions={{
+            headerShown: false,
+            contentStyle: { paddingHorizontal: 4 },
+          }}
+          initialRouteName="(tabs)"
+        >
           <Stack.Screen name="index" />
           <Stack.Screen name="(tabs)" />
           <Stack.Screen name="login" />
           <Stack.Screen name="settings" />
           <Stack.Screen name="event-details/[id]" />
+          <Stack.Screen name="event-ticket-theme/[eventId]" />
+          <Stack.Screen name="created-event-details/[id]" />
+          <Stack.Screen name="edit-event/[id]" />
           <Stack.Screen name="user/[id]" />
           <Stack.Screen name="ticket/[id]" />
+          <Stack.Screen name="event-filter" />
           <Stack.Screen name="+not-found" />
         </Stack>
         <StatusBar style={colorScheme === 'dark' ? 'light' : 'dark'} />

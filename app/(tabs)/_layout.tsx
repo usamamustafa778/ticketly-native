@@ -7,7 +7,6 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Tabs, useRouter } from 'expo-router';
 import React from 'react';
 import { Platform } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { BottomTabBarButtonProps } from '@react-navigation/bottom-tabs';
 
 function CreateTabButton(props: BottomTabBarButtonProps) {
@@ -30,7 +29,6 @@ function CreateTabButton(props: BottomTabBarButtonProps) {
 
 export default function TabLayout() {
   const colorScheme = useColorScheme();
-  const insets = useSafeAreaInsets();
 
   return (
     <Tabs
@@ -47,9 +45,10 @@ export default function TabLayout() {
           borderTopColor: '#E5E7EB',
           height: Platform.OS === 'ios' ? 56 : 52,
           paddingBottom: 36,
+          paddingHorizontal: 4,
           paddingTop: 4,
           elevation: 0,
-          marginBottom: Platform.OS === 'android' ? 38 : 0,
+          marginBottom: Platform.OS === 'android' ? 2 : 0,
         },
       }}>
       <Tabs.Screen
@@ -89,7 +88,12 @@ export default function TabLayout() {
           ),
         }}
       />
-   
+      <Tabs.Screen
+        name="user/[id]"
+        options={{
+          href: null,
+        }}
+      />
     </Tabs>
   );
 }
