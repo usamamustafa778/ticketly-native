@@ -44,7 +44,7 @@
           "android": {
             "newArchEnabled": true,
             "usesCleartextTraffic": true,
-            "minSdkVersion": 23,
+            "minSdkVersion": 24,
             "compileSdkVersion": 34,
             "targetSdkVersion": 34,
             "kotlinVersion": "2.1.20",
