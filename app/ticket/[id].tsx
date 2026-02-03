@@ -8,6 +8,7 @@ import {
   ActivityIndicator,
   Alert,
   RefreshControl,
+  Platform,
 } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -18,6 +19,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { BackButton } from '@/components/BackButton';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { API_BASE_URL } from '@/lib/config';
+import * as Linking from 'expo-linking';
 import { getEventImageUrl } from '@/lib/utils/imageUtils';
 import { TicketPreview } from '@/components/TicketPreview';
 
@@ -82,6 +84,15 @@ export default function TicketScreen() {
     // Otherwise, construct from relative path and API_BASE_URL
     const baseUrl = API_BASE_URL.replace('/api', '');
     return `${baseUrl}${paymentScreenshotUrl}`;
+  };
+
+  // Helper for full QR code URL (for confirmed tickets)
+  const getQrCodeUrl = () => {
+    if (!ticket?.qrCodeUrl) return null;
+    const qr = ticket.qrCodeUrl;
+    if (qr.startsWith('http')) return qr;
+    const baseUrl = API_BASE_URL.replace('/api', '');
+    return `${baseUrl}${qr.startsWith('/') ? qr : `/${qr}`}`;
   };
 
   useEffect(() => {
@@ -322,7 +333,7 @@ export default function TicketScreen() {
         }
       >
       {/* Ticket Card - uses event ticket theme */}
-      <View className="mx-[20px] mb-6">
+      <View className="mx-[20px] mb-3">
         <TicketPreview
           theme={ticket.event?.ticketTheme}
           event={ticket.event}
@@ -334,6 +345,26 @@ export default function TicketScreen() {
           createdAt={ticket.createdAt}
         />
       </View>
+
+      {/* Download ticket button (opens QR / image for saving) */}
+      {ticket.status === 'confirmed' && getQrCodeUrl() && (
+        <View className="mx-[20px] mb-6">
+          <TouchableOpacity
+            className="py-2.5 rounded-lg bg-primary items-center"
+            onPress={() => {
+              const url = getQrCodeUrl();
+              if (!url) return;
+              Linking.openURL(url).catch(() => {
+                Alert.alert('Error', 'Unable to open ticket for download.');
+              });
+            }}
+          >
+            <Text className="text-white text-xs font-semibold">
+              Download Ticket
+            </Text>
+          </TouchableOpacity>
+        </View>
+      )}
 
       {/* Payment section - separate card below ticket */}
       {(ticket.status === 'payment_in_review' || ticket.status === 'pending_payment') && (
@@ -479,16 +510,17 @@ export default function TicketScreen() {
             <Text className="text-[#F59E0B] text-base font-semibold mb-2 text-center">
               Payment Pending
             </Text>
-            <Text className="text-[#9CA3AF] text-sm text-center mb-4">
+            <Text className="text-gay-900 text-sm text-center mb-4">
               Please upload a screenshot of your payment to confirm your ticket.
             </Text>
 
             {/* Payment Method Selection */}
             <View className="mb-4">
-              <Text className="text-[#9CA3AF] text-xs mb-2">Payment Method</Text>
+              <Text className="text-gray-900 text-xs mb-2">Payment Method</Text>
               <View className="flex-row gap-2">
                 {['bank_transfer', 'easypaisa', 'jazzcash', 'other'].map((method) => (
                   <TouchableOpacity
+                    activeOpacity={1}
                     key={method}
                     onPress={() => setPaymentMethod(method)}
                     className={`px-3 py-2 rounded-lg border ${paymentMethod === method
@@ -516,7 +548,7 @@ export default function TicketScreen() {
                 const phoneNumber = ticket.event?.createdBy?.phone || ticket.event?.phone || ticket.organizer?.phone;
                 return phoneNumber ? (
                   <View className="mt-3">
-                    <Text className="text-[#9CA3AF] text-xs mb-1">
+                    <Text className="text-gray-900 text-xs mb-1">
                       Send payment to: {phoneNumber}
                     </Text>
                   </View>
@@ -526,7 +558,7 @@ export default function TicketScreen() {
 
             {/* Screenshot Selection */}
             <View className="mb-4">
-              <Text className="text-[#9CA3AF] text-xs mb-2">Payment Screenshot</Text>
+              <Text className="text-gray-900 text-xs mb-2">Payment Screenshot</Text>
               {screenshotUri ? (
                 <View className="relative">
                   <Image

@@ -623,7 +623,7 @@ export default function ProfileScreen() {
         contentContainerStyle={{ paddingTop: insets.top + 10, paddingBottom: bottomPadding, paddingHorizontal: 2 }}
         keyExtractor={(item) => item.id}
         numColumns={2}
-        columnWrapperStyle={{ gap: 2, marginBottom: 2 }}
+        columnWrapperStyle={{ gap: 4, marginBottom: 4 }}
         renderItem={renderProfileEventCard}
         refreshControl={
           <RefreshControl
@@ -638,7 +638,7 @@ export default function ProfileScreen() {
             {/* Profile Header */}
             <View className="flex-row justify-end items-center px-3 pb-2">
               <TouchableOpacity
-                className="bg-gray-100 w-10 h-10 rounded-lg items-center justify-center"
+                className=" w-10 h-10 rounded-lg items-center justify-center"
                 onPress={() => router.push('/settings')}
               >
                 <MaterialIcons name="menu" size={24} color="#111827" />

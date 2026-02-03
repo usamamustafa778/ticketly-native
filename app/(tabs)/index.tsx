@@ -327,7 +327,7 @@ export default function HomeScreen() {
         }}
       >
         <View
-          className="bg-white border-b border-gray-200 overflow-hidden"
+          className="bg-white shadow-[0_0_10px_rgba(0,0,0,0.1)] overflow-hidden"
           style={{ paddingTop: safeTop }}
           pointerEvents="box-none"
         >
@@ -381,7 +381,7 @@ export default function HomeScreen() {
           }}
           keyExtractor={(item) => item.id}
           numColumns={2}
-          columnWrapperStyle={{ gap: 2, marginBottom: 2 }}
+          columnWrapperStyle={{ gap: 4, marginBottom: 4 }}
           renderItem={({ item }) => (
             <View className="flex-1">
               {item._skeleton ? <EventCardSkeleton /> : <EventCard event={item} />}

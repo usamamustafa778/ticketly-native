@@ -346,7 +346,19 @@ export default function EventDetailsScreen() {
 
         setUserTicketId(response.ticket.id);
         setIsRegistered(true);
-        setModalMessage('Ticket created successfully! Please submit payment to confirm your ticket.');
+
+        const isFreeEvent =
+          (event as any)?.price?.price === 'free' ||
+          (event as any)?.price?.currency === null ||
+          !event?.ticketPrice ||
+          event.ticketPrice <= 0 ||
+          response.ticket.status === 'confirmed';
+
+        setModalMessage(
+          isFreeEvent
+            ? 'Your free ticket is confirmed! You can view your QR code in the ticket screen.'
+            : 'Ticket created successfully! Please submit payment to confirm your ticket.'
+        );
         setShowModal(true);
       }
     } catch (error: any) {
@@ -533,7 +545,8 @@ export default function EventDetailsScreen() {
           </View>
 
           {/* Register / Get More Tickets Button */}
-          <TouchableOpacity
+          {!isRegistered && 
+          (  <TouchableOpacity
             className="py-2.5 rounded-lg items-center mt-2 bg-primary"
             onPress={handleRegister}
             disabled={creatingTicket}
@@ -546,6 +559,9 @@ export default function EventDetailsScreen() {
               </Text>
             )}
           </TouchableOpacity>
+          )
+          }
+         
 
         </View>
 
@@ -879,11 +895,11 @@ export default function EventDetailsScreen() {
             resizeMode="contain"
           />
           <TouchableOpacity
-            className="absolute right-4 bg-white/20 w-10 h-10 rounded-full items-center justify-center"
+            className="absolute right-4 bg-white/20 w-7 h-7 rounded-full items-center justify-center"
             style={{ top: insets.top + 8 }}
             onPress={() => setShowImageViewer(false)}
           >
-            <MaterialIcons name="close" size={24} color="#FFFFFF" />
+            <MaterialIcons name="close" size={18} color="#FFFFFF" />
           </TouchableOpacity>
         </Pressable>
       </RNModal>

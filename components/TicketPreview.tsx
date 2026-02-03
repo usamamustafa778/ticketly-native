@@ -274,14 +274,14 @@ export function TicketPreview({
             </View>
           ) : (
             <View
-              className="ml-2 p-2 rounded-lg min-w-[56px] min-h-[56px] items-center justify-center"
+              className="ml-2 p-2 rounded-lg min-w-[56px] overflow-hidden min-h-[56px] items-center justify-center"
               style={{ backgroundColor: `${t.accentColor}15`, borderWidth: 1, borderColor: `${t.accentColor}40` }}
             >
               <Text
-                className="text-[9px] text-center"
-                style={{ color: t.primaryTextColor }}
+                className="text-[9px] text-center "
+                style={{ color: t.primaryTextColor, maxWidth: 56 }}
               >
-                QR after confirm
+                QR after payment confirm
               </Text>
             </View>
           )}

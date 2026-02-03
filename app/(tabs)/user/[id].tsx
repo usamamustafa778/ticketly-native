@@ -213,13 +213,13 @@ export default function UserProfileScreen() {
         data={currentEvents}
         style={{ flex: 1 }}
         contentContainerStyle={{
-          paddingTop: insets.top + 48,
+          paddingTop: insets.top + 58,
           paddingBottom: bottomPadding,
           paddingHorizontal: 2,
         }}
         keyExtractor={(item) => item.id}
         numColumns={2}
-        columnWrapperStyle={{ gap: 2, marginBottom: 2 }}
+        columnWrapperStyle={{ gap: 4, marginBottom: 4 }}
         renderItem={({ item }) => (
           <View className="flex-1">
             <EventCard
@@ -270,22 +270,9 @@ export default function UserProfileScreen() {
                 <Text className="text-primary text-base font-semibold mt-1">{profile.companyName}</Text>
               )}
             </View>
-            <View className="flex-row justify-around px-16 py-2">
-              <View className="items-center">
-                <Text className="text-gray-900 text-base font-bold mb-0.5">{createdEvents.length}</Text>
-                <Text className="text-[#9CA3AF] text-[10px]">Created</Text>
-              </View>
-              <View className="items-center">
-                <Text className="text-gray-900 text-base font-bold mb-0.5">{joinedEvents.length}</Text>
-                <Text className="text-[#9CA3AF] text-[10px]">Joined</Text>
-              </View>
-              <View className="items-center">
-                <Text className="text-gray-900 text-base font-bold mb-0.5">{likedEvents.length}</Text>
-                <Text className="text-[#9CA3AF] text-[10px]">Liked</Text>
-              </View>
-            </View>
-            <View className="mx-10">
-              <View className="py-2 mb-3 translate-y-[-2px] bg-white">
+       
+            <View className="mx-10 ">
+              <View className="py-2  translate-y-[-2px] bg-white">
                 <TabsRow
                   items={[
                     { key: 'created', label: 'Created Events' },

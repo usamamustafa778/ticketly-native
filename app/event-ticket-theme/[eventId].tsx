@@ -43,7 +43,7 @@ const LABELS: Partial<Record<keyof TicketTheme, string>> = {
   gradientStart: 'Gradient start',
   gradientEnd: 'Gradient end',
   primaryTextColor: 'Text color',
-  accentColor: 'Accent / divider',
+  accentColor: 'Accent / divider / background',
   brandColor: 'Brand / logo',
 };
 
@@ -140,10 +140,24 @@ export default function EventTicketThemeScreen() {
   };
 
   if (loading || !event) {
+    // Simple skeleton shimmer for ticket theme screen
     return (
-      <View className="flex-1 bg-white items-center justify-center">
-        <ActivityIndicator size="large" color="#DC2626" />
-        <Text className="text-gray-600 mt-3">Loading...</Text>
+      <View className="flex-1 bg-white px-3 pt-3">
+        <View className="flex-row items-center justify-between mb-3">
+          <View className="w-8 h-8 rounded-full bg-gray-200" />
+          <View className="w-32 h-4 rounded-full bg-gray-200" />
+          <View className="w-8 h-8 rounded-full bg-gray-200" />
+        </View>
+        <View className="rounded-xl h-56 bg-gray-200 mb-4" />
+        <View className="h-3 w-24 rounded-full bg-gray-200 mb-2" />
+        <View className="flex-row justify-between">
+          {Array.from({ length: 5 }).map((_, i) => (
+            <View key={i} className="w-14 items-center">
+              <View className="w-9 h-9 rounded-full bg-gray-200 mb-1" />
+              <View className="h-2 w-10 rounded-full bg-gray-200" />
+            </View>
+          ))}
+        </View>
       </View>
     );
   }
@@ -155,7 +169,7 @@ export default function EventTicketThemeScreen() {
       className="flex-1 bg-white"
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
-      <View className="pt-[52px] px-3 pb-2 border-b border-gray-200">
+      <View className="pt-[6px] px-3 pb-2 border-b border-gray-200">
         <View className="flex-row items-center justify-between">
           <BackButton onPress={() => router.back()} />
           <Text className="text-gray-900 text-sm font-semibold">Event Ticket Theme</Text>

@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, StyleSheet } from 'react-native';
+import { View, StyleSheet, Platform } from 'react-native';
 import Svg, { Line, Path } from 'react-native-svg';
 import type { BackgroundElement, PatternWeight } from '@/lib/types/ticketTheme';
 
@@ -52,7 +52,8 @@ function OrganicBlobs({ width, height, overlayColor, sizeMult }: { width: number
         opacity={op}
       />
       <Path
-        d={`M ${width * 0.15} ${height + 10} C ${width * 0.15} ${height * 0.6} ${width * 0.5} ${height * 0.4} ${width * 0.5} ${height * 0.7} C ${width * 0.85} ${height * 0.65} ${width * 0.85} ${height + 10} ${width * 0.15} ${height + 10} Z`}
+        // Avoid "Z" close command for better Android compatibility; close explicitly.
+        d={`M ${width * 0.15} ${height + 10} C ${width * 0.15} ${height * 0.6} ${width * 0.5} ${height * 0.4} ${width * 0.5} ${height * 0.7} C ${width * 0.85} ${height * 0.65} ${width * 0.85} ${height + 10} L ${width * 0.15} ${height + 10}`}
         fill={overlayColor}
         opacity={0.35}
       />
@@ -65,17 +66,18 @@ function FluidWaves({ width, height, overlayColor, sizeMult }: { width: number; 
   return (
     <Svg width={width} height={height} style={StyleSheet.absoluteFill} pointerEvents="none">
       <Path
-        d={`M -20 ${height * 0.25} C ${width * 0.2} ${height * 0.1} ${width * 0.5} ${height * 0.35} ${width + 20} ${height * 0.2} L ${width + 20} ${height + 20} L -20 ${height + 20} Z`}
+        // Close via explicit line back to start instead of "Z"
+        d={`M -20 ${height * 0.25} C ${width * 0.2} ${height * 0.1} ${width * 0.5} ${height * 0.35} ${width + 20} ${height * 0.2} L ${width + 20} ${height + 20} L -20 ${height + 20} L -20 ${height * 0.25}`}
         fill={overlayColor}
         opacity={0.45}
       />
       <Path
-        d={`M -20 ${height * 0.55} C ${width * 0.3} ${height * 0.45} ${width * 0.65} ${height * 0.7} ${width + 20} ${height * 0.5} L ${width + 20} ${height + 20} L -20 ${height + 20} Z`}
+        d={`M -20 ${height * 0.55} C ${width * 0.3} ${height * 0.45} ${width * 0.65} ${height * 0.7} ${width + 20} ${height * 0.5} L ${width + 20} ${height + 20} L -20 ${height + 20} L -20 ${height * 0.55}`}
         fill={overlayColor}
         opacity={0.4}
       />
       <Path
-        d={`M -20 ${height * 0.8} C ${width * 0.25} ${height * 0.65} ${width * 0.55} ${height * 0.9} ${width + 20} ${height * 0.75} L ${width + 20} ${height + 20} L -20 ${height + 20} Z`}
+        d={`M -20 ${height * 0.8} C ${width * 0.25} ${height * 0.65} ${width * 0.55} ${height * 0.9} ${width + 20} ${height * 0.75} L ${width + 20} ${height + 20} L -20 ${height + 20} L -20 ${height * 0.8}`}
         fill={overlayColor}
         opacity={0.42}
       />
@@ -104,17 +106,17 @@ function GradientMeshBlobs({ width, height, overlayColor, sizeMult }: { width: n
   return (
     <Svg width={width} height={height} style={StyleSheet.absoluteFill} pointerEvents="none">
       <Path
-        d={`M -20 ${height * 0.15} C ${width * 0.3} ${height * 0.05} ${width * 0.6} ${height * 0.25} ${width + 20} ${height * 0.12} L ${width + 20} ${height + 20} L -20 ${height + 20} Z`}
+        d={`M -20 ${height * 0.15} C ${width * 0.3} ${height * 0.05} ${width * 0.6} ${height * 0.25} ${width + 20} ${height * 0.12} L ${width + 20} ${height + 20} L -20 ${height + 20} L -20 ${height * 0.15}`}
         fill={overlayColor}
         opacity={0.38}
       />
       <Path
-        d={`M -20 ${height * 0.45} C ${width * 0.2} ${height * 0.35} ${width * 0.7} ${height * 0.55} ${width + 20} ${height * 0.4} L ${width + 20} ${height + 20} L -20 ${height + 20} Z`}
+        d={`M -20 ${height * 0.45} C ${width * 0.2} ${height * 0.35} ${width * 0.7} ${height * 0.55} ${width + 20} ${height * 0.4} L ${width + 20} ${height + 20} L -20 ${height + 20} L -20 ${height * 0.45}`}
         fill={overlayColor}
         opacity={0.35}
       />
       <Path
-        d={`M -20 ${height * 0.72} C ${width * 0.35} ${height * 0.6} ${width * 0.65} ${height * 0.85} ${width + 20} ${height * 0.68} L ${width + 20} ${height + 20} L -20 ${height + 20} Z`}
+        d={`M -20 ${height * 0.72} C ${width * 0.35} ${height * 0.6} ${width * 0.65} ${height * 0.85} ${width + 20} ${height * 0.68} L ${width + 20} ${height + 20} L -20 ${height + 20} L -20 ${height * 0.72}`}
         fill={overlayColor}
         opacity={0.4}
       />
@@ -164,7 +166,7 @@ function DynamicBlobs({ width, height, overlayColor, sizeMult }: { width: number
         opacity={op}
       />
       <Path
-        d={`M ${width * 0.2} ${height} C ${width * 0.2} ${height * 0.5} ${width * 0.5} ${height * 0.35} ${width * 0.5} ${height * 0.65} C ${width * 0.8} ${height * 0.6} ${width * 0.8} ${height} Z`}
+        d={`M ${width * 0.2} ${height} C ${width * 0.2} ${height * 0.5} ${width * 0.5} ${height * 0.35} ${width * 0.5} ${height * 0.65} C ${width * 0.8} ${height * 0.6} ${width * 0.8} ${height} L ${width * 0.2} ${height}`}
         fill={overlayColor}
         opacity={0.38}
       />
@@ -209,7 +211,7 @@ function GeometricSoft({ width, height, overlayColor, sizeMult }: { width: numbe
   return (
     <Svg width={width} height={height} style={StyleSheet.absoluteFill} pointerEvents="none">
       <Path
-        d={`M 0 ${height * 0.3} L ${width * 0.4} ${height * 0.1} L ${width * 0.8} ${height * 0.25} L ${width} ${height * 0.5} L ${width * 0.6} ${height * 0.9} L ${width * 0.2} ${height * 0.75} Z`}
+        d={`M 0 ${height * 0.3} L ${width * 0.4} ${height * 0.1} L ${width * 0.8} ${height * 0.25} L ${width} ${height * 0.5} L ${width * 0.6} ${height * 0.9} L ${width * 0.2} ${height * 0.75} L 0 ${height * 0.3}`}
         fill={overlayColor}
         opacity={0.32}
       />
@@ -252,7 +254,10 @@ function SoftMesh({ width, height, overlayColor, sizeMult }: { width: number; he
         opacity={op}
       />
       <Path
-        d={`M ${width * 0.1} ${height + 20} C ${width * 0.1} ${height * 0.55} ${width * 0.55} ${height * 0.3} ${width * 0.55} ${height * 0.7} C ${width * 0.9} ${height * 0.55} ${width * 0.9} ${height + 20} Z`}
+        // NOTE: avoid SVG close-path command "Z" here; some Android builds of react-native-svg
+        // can mis-parse it in certain path strings and throw "Invalid number formating character 'Z'".
+        // Closing explicitly via a final line back to the start is equivalent for our filled shape.
+        d={`M ${width * 0.1} ${height + 20} C ${width * 0.1} ${height * 0.55} ${width * 0.55} ${height * 0.3} ${width * 0.55} ${height * 0.7} C ${width * 0.9} ${height * 0.55} ${width * 0.9} ${height + 20} L ${width * 0.1} ${height + 20}`}
         fill={overlayColor}
         opacity={0.36}
       />
@@ -274,7 +279,7 @@ function VectorSoft({ width, height, overlayColor, sizeMult }: { width: number; 
   return (
     <Svg width={width} height={height} style={StyleSheet.absoluteFill} pointerEvents="none">
       <Path
-        d={`M ${width * 0.1} ${height} C ${width * 0.1} ${height * 0.5} ${width * 0.5} ${height * 0.4} ${width * 0.5} ${height * 0.6} C ${width * 0.9} ${height * 0.55} ${width * 0.9} ${height} Z`}
+        d={`M ${width * 0.1} ${height} C ${width * 0.1} ${height * 0.5} ${width * 0.5} ${height * 0.4} ${width * 0.5} ${height * 0.6} C ${width * 0.9} ${height * 0.55} ${width * 0.9} ${height} L ${width * 0.1} ${height}`}
         fill={overlayColor}
         opacity={0.35}
       />
@@ -298,10 +303,18 @@ export function BackgroundPattern({
 }: BackgroundPatternProps) {
   if (element === 'none') return null;
 
+  // Some complex SVG paths trigger parsing issues on certain Android SVG runtimes,
+  // especially in Expo Go. For maximum stability we map the most complex patterns
+  // to simpler ones on Android while keeping full fidelity on web/iOS.
+  const effectiveElement: BackgroundElement =
+    Platform.OS === 'android' && element === 'mesh'
+      ? 'gradient_mesh'
+      : element;
+
   const sizeMult = WEIGHT_MULTIPLIER[patternWeight] ?? WEIGHT_MULTIPLIER.medium;
 
   const SvgPattern = () => {
-    switch (element) {
+    switch (effectiveElement) {
       case 'organic':
         return <OrganicBlobs width={width} height={height} overlayColor={overlayColor} sizeMult={sizeMult} />;
 

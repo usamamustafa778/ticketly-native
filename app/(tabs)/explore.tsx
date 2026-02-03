@@ -273,7 +273,7 @@ export default function ExploreScreen() {
           )}
           keyExtractor={(item) => item.id}
           numColumns={2}
-          columnWrapperStyle={{ gap: 2, marginBottom: 2 }}
+          columnWrapperStyle={{ gap: 4, marginBottom: 4 }}
           refreshControl={
             <RefreshControl
               refreshing={refreshing}

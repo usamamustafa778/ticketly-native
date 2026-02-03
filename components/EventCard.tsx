@@ -4,6 +4,7 @@ import { Event } from '@/data/mockData';
 import { useRouter } from 'expo-router';
 import { getEventImageUrl } from '@/lib/utils/imageUtils';
 import { Label } from '@/components/ui/Label';
+import { LinearGradient } from 'expo-linear-gradient';
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 const DROPUP_HEIGHT = Math.min(SCREEN_HEIGHT * 0.5, 400);
@@ -59,38 +60,46 @@ export const EventCard: React.FC<EventCardProps> = ({ event, onPress }) => {
 
   return (
     <TouchableOpacity
-      className="bg-[#1F1F1F] rounded-md overflow-hidden w-full"
+      className="rounded-md overflow-hidden w-full h-[220px] relative"
       onPress={handlePress}
       activeOpacity={0.8}
     >
-      <View className="w-full h-[150px] relative">
-        <Image
-          source={{ uri: getEventImageUrl(event) || 'https://images.unsplash.com/photo-1470229722913-7c0e2dbbafd3?w=800' }}
-          className="w-full h-full"
-          resizeMode="cover"
-        />
-        {/* Price pill (e.g. Free / Rs 500) */}
-        <View className="absolute bottom-2 left-3">
-          <Label variant={isFree ? 'neutral' : 'primary'} small>
-            {priceLabel}
-          </Label>
-        </View>
-        {/* Joined users avatars pill on image (or count when list not loaded) */}
-        {(joinedUsers.length > 0 || joinedCount > 0) && (
-          <View className="absolute bottom-0 h-5 right-[-5px] flex-row items-center translate-y-1/2">
-            {/* Joined users: avatars when available, or "X going" pill when only count is known */}
-            {joinedUsers.length > 0 ? (
-              <TouchableOpacity
-                className="flex-row items-center rounded-full p-1 mr-1 pr-4"
-                activeOpacity={0.9}
-                onPress={(e) => {
-                  e?.stopPropagation?.();
-                  setJoinedUsersDropUpVisible(true);
-                }}
-              >
-                {visibleJoined.map((user, index) => {
-                  const u = user as JoinedUser;
-                  return (
+      {/* Full background image */}
+      <Image
+        source={{ uri: getEventImageUrl(event) || 'https://images.unsplash.com/photo-1470229722913-7c0e2dbbafd3?w=800' }}
+        className="absolute inset-0 w-full h-full"
+        resizeMode="cover"
+      />
+
+      {/* Gradient overlay from bottom (opaque) to top (transparent) */}
+      <LinearGradient
+        colors={['transparent', 'rgba(0,0,0,0.6)', 'rgba(0,0,0,0.85)', 'rgba(0,0,0,1)']}
+        locations={[0, 0.35, 0.65, 1]}
+        className="absolute bottom-0 w-full h-[60%]"
+      />
+
+      {/* Price pill at top-left */}
+      <View className="absolute top-2 left-2">
+        <Label variant={isFree ? 'neutral' : 'primary'} small>
+          {priceLabel}
+        </Label>
+      </View>
+
+      {/* Joined users avatars at top-right */}
+      {(joinedUsers.length > 0 || joinedCount > 0) && (
+        <View className="absolute top-2 right-2 flex-row items-center">
+          {joinedUsers.length > 0 ? (
+            <TouchableOpacity
+              className="flex-row items-center"
+              activeOpacity={0.9}
+              onPress={(e) => {
+                e?.stopPropagation?.();
+                setJoinedUsersDropUpVisible(true);
+              }}
+            >
+              {visibleJoined.map((user, index) => {
+                const u = user as JoinedUser;
+                return (
                   <Image
                     key={u.id || u._id || index}
                     source={{
@@ -99,61 +108,52 @@ export const EventCard: React.FC<EventCardProps> = ({ event, onPress }) => {
                         u.profileImageUrl ||
                         'https://images.unsplash.com/photo-1494797710133-75adf6c1f4a3?w=200',
                     }}
-                    className="w-7 h-7 rounded-full border border-[#111827]"
-                    style={{ marginLeft: index === 0 ? 0 : -6 }}
+                    className="w-6 h-6 rounded-full border-[0.5px] border-white"
+                    style={{ marginLeft: index === 0 ? 0 : -8 }}
                     resizeMode="cover"
                   />
-                  );
-                })}
-                {remainingCount > 0 && (
-                  <View className="px-1.5 mr-1 py-[1px] absolute right-[8px] h-4 min-w-5 rounded-full bg-[#111827]">
-                    <Text className="text-white text-[8px] font-medium">
-                      +{remainingCount}
-                    </Text>
-                  </View>
-                )}
-              </TouchableOpacity>
-            ) : joinedCount > 0 ? (
-              <TouchableOpacity
-                className="rounded-full bg-[#111827] px-2 py-1 mr-1"
-                activeOpacity={0.9}
-                onPress={(e) => {
-                  e?.stopPropagation?.();
-                  setJoinedUsersDropUpVisible(true);
-                }}
-              >
-                <Text className="text-white text-[9px] font-medium">
-                  {joinedCount} going
-                </Text>
-              </TouchableOpacity>
-            ) : null}
+                );
+              })}
+              {remainingCount > 0 && (
+                <View className="ml-1 px-1.5 py-[2px] rounded-full bg-black/70">
+                  <Text className="text-white text-[9px] font-medium">
+                    +{remainingCount}
+                  </Text>
+                </View>
+              )}
+            </TouchableOpacity>
+          ) : joinedCount > 0 ? (
+            <TouchableOpacity
+              className="rounded-full bg-black/70 px-2 py-1"
+              activeOpacity={0.9}
+              onPress={(e) => {
+                e?.stopPropagation?.();
+                setJoinedUsersDropUpVisible(true);
+              }}
+            >
+              <Text className="text-white text-[9px] font-medium">
+                {joinedCount} going
+              </Text>
+            </TouchableOpacity>
+          ) : null}
+        </View>
+      )}
 
-            {/* Host avatar on image (slightly larger) */}
-
-          </View>
-        )}
-
-      </View>
-      <View className="p-3">
-        {/* Date & time row (e.g. 15 Feb 11:00) */}
-        <Text className="text-[#9CA3AF] text-[9px] mb-1">
+      {/* Content at bottom */}
+      <View className="absolute bottom-0 left-0 right-0 p-3">
+        {/* Date & time row */}
+        <Text className="text-gray-300 text-[10px] mb-1">
           {new Date(event.date).toLocaleDateString('en-GB', {
             day: '2-digit',
             month: 'short',
           })}{' '}
           {event.time}
         </Text>
-        <Text className="text-white text-[13px] font-semibold mb-2" numberOfLines={1}>
+        <Text className="text-white text-[14px] font-semibold mb-2" numberOfLines={1}>
           {event.title}
         </Text>
-        {/* <View className="flex-row items-center">
-          <Text className="text-xs mr-1">📍</Text>
-          <Text className="text-[#9CA3AF] text-xs flex-1" numberOfLines={1}>
-            {event.venue.length > 30 ? `${event.venue.substring(0, 30)}...` : event.venue}
-          </Text>
-        </View> */}
 
-        {/* Host row (text + avatar). Clickable to open host profile. */}
+        {/* Host row */}
         {(() => {
           const ev = event as any;
           const organizerId = ev.organizerId || ev.createdBy?._id || ev.createdBy?.id || '';
@@ -165,34 +165,34 @@ export const EventCard: React.FC<EventCardProps> = ({ event, onPress }) => {
                 source={{
                   uri: hostAvatarUrl || 'https://images.unsplash.com/photo-1494797710133-75adf6c1f4a3?w=200',
                 }}
-                  className="w-7 h-7 rounded-full border border-[#111827] bg-black/80"
-                  resizeMode="cover"
-                />
-                <View>
-                  <Text className="text-white text-[10px] font-semibold max-w-[100px]" numberOfLines={1}>
-                    {event.organizerName || 'Host'}
-                  </Text>
-                  <Text className="text-[#9CA3AF] text-[9px]">(Host)</Text>
-                </View>
+                className="w-6 h-6 rounded-full border-[0.5px] border-white"
+                resizeMode="cover"
+              />
+              <View>
+                <Text className="text-white text-[11px] font-semibold max-w-[100px]" numberOfLines={1}>
+                  {event.organizerName || 'Host'}
+                </Text>
+                <Text className="text-gray-400 text-[9px]">(Host)</Text>
               </View>
-            );
-            return organizerId ? (
-              <TouchableOpacity
-                className="flex-row items-center justify-between"
-                onPress={(e) => {
-                  (e as any)?.stopPropagation?.();
-                  router.push(`/user/${organizerId}`);
-                }}
-                activeOpacity={0.8}
-              >
-                <HostContent />
-              </TouchableOpacity>
-            ) : (
-              <View className="flex-row items-center justify-between">
-                <HostContent />
-              </View>
-            );
-          })()}
+            </View>
+          );
+          return organizerId ? (
+            <TouchableOpacity
+              className="flex-row items-center"
+              onPress={(e) => {
+                (e as any)?.stopPropagation?.();
+                router.push(`/user/${organizerId}`);
+              }}
+              activeOpacity={0.8}
+            >
+              <HostContent />
+            </TouchableOpacity>
+          ) : (
+            <View className="flex-row items-center">
+              <HostContent />
+            </View>
+          );
+        })()}
       </View>
 
       {/* Joined users drop-up (bottom to middle) */}
@@ -246,7 +246,7 @@ export const EventCard: React.FC<EventCardProps> = ({ event, onPress }) => {
                         user.profileImageUrl ||
                         'https://images.unsplash.com/photo-1494797710133-75adf6c1f4a3?w=200',
                     }}
-                    className="w-10 h-10 rounded-full bg-[#374151]"
+                    className="w-6 h-6 rounded-full bg-[#374151]"
                     resizeMode="cover"
                   />
                   <Text className="text-white text-base font-medium ml-3 flex-1" numberOfLines={1}>
