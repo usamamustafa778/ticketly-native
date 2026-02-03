@@ -80,6 +80,14 @@
         {
           "cameraPermission": "Allow Ticketly to access your camera to scan QR codes for ticket validation."
         }
+      ],
+      [
+        "expo-media-library",
+        {
+          "photosPermission": "Allow Ticketly to save your ticket to your photo library.",
+          "savePhotosPermission": "Allow Ticketly to save your ticket image to your photos.",
+          "granularPermissions": ["photo"]
+        }
       ]
     ],
     "experiments": {

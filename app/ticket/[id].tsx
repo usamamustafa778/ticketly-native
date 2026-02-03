@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -16,6 +16,9 @@ import { useAppStore } from '@/store/useAppStore';
 import { ticketsAPI, type Ticket } from '@/lib/api/tickets';
 import { paymentsAPI } from '@/lib/api/payments';
 import * as ImagePicker from 'expo-image-picker';
+import { captureRef } from 'react-native-view-shot';
+import * as MediaLibrary from 'expo-media-library';
+import * as Sharing from 'expo-sharing';
 import { BackButton } from '@/components/BackButton';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { API_BASE_URL } from '@/lib/config';
@@ -42,6 +45,11 @@ export default function TicketScreen() {
   // QR code loading states
   const [qrImageLoaded, setQrImageLoaded] = useState(false);
   const [qrImageError, setQrImageError] = useState(false);
+
+  // Ticket card ref for capture (download / share)
+  const ticketCardRef = useRef<View>(null);
+  const [downloadingTicket, setDownloadingTicket] = useState(false);
+  const [sharingTicket, setSharingTicket] = useState(false);
 
   // Helper function to get full payment screenshot URL (same logic as profile image)
   const getPaymentScreenshotUrl = () => {
@@ -258,6 +266,79 @@ export default function TicketScreen() {
     }
   };
 
+  // Capture ticket card as image and save to device gallery
+  const handleDownloadTicket = async () => {
+    if (Platform.OS === 'web') {
+      Alert.alert('Not available', 'Saving to gallery is not available on web. Use the app on your phone to download the ticket.');
+      return;
+    }
+    if (!ticketCardRef.current) return;
+    try {
+      setDownloadingTicket(true);
+      // On Android 13+, request only photo permission so we don't trigger AUDIO permission error
+      const { status } =
+        Platform.OS === 'android'
+          ? await MediaLibrary.requestPermissionsAsync(false, ['photo'])
+          : await MediaLibrary.requestPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert(
+          'Permission needed',
+          'Allow access to save the ticket image to your photo library.',
+          [{ text: 'OK' }]
+        );
+        return;
+      }
+      const uri = await captureRef(ticketCardRef, {
+        format: 'jpg',
+        quality: 0.95,
+        result: 'tmpfile',
+        width: 800,
+      });
+      await MediaLibrary.saveToLibraryAsync(uri);
+      Alert.alert('Saved', 'Ticket saved to your photo library.');
+    } catch (err: any) {
+      console.error('Download ticket error:', err);
+      Alert.alert('Error', err?.message || 'Could not save ticket to gallery.');
+    } finally {
+      setDownloadingTicket(false);
+    }
+  };
+
+  // Capture ticket as image and share via system share sheet (shares image file, not text)
+  const handleShareTicket = async () => {
+    if (Platform.OS === 'web') {
+      Alert.alert('Not available', 'Sharing is not available on web. Use the app on your phone to share the ticket.');
+      return;
+    }
+    if (!ticketCardRef.current) return;
+    try {
+      setSharingTicket(true);
+      const uri = await captureRef(ticketCardRef, {
+        format: 'jpg',
+        quality: 0.95,
+        result: 'tmpfile',
+        width: 800,
+      });
+      const isAvailable = await Sharing.isAvailableAsync();
+      if (!isAvailable) {
+        Alert.alert('Not available', 'Sharing is not available on this device.');
+        return;
+      }
+      const eventTitle = ticket?.event?.title || 'My ticket';
+      await Sharing.shareAsync(uri, {
+        mimeType: 'image/jpeg',
+        dialogTitle: `${eventTitle} – Share ticket`,
+      });
+    } catch (err: any) {
+      if (err?.message && !err.message.includes('User did not share') && !err.message.includes('cancel')) {
+        console.error('Share ticket error:', err);
+        Alert.alert('Error', err?.message || 'Could not share ticket.');
+      }
+    } finally {
+      setSharingTicket(false);
+    }
+  };
+
   if (loading) {
     return (
       <View className="flex-1 bg-white">
@@ -301,6 +382,20 @@ export default function TicketScreen() {
     );
   }
 
+  // Determine if this ticket is for a free event
+  const isFreeEvent =
+    (ticket as any)?.event?.price?.price === 'free' ||
+    (ticket as any)?.event?.price?.currency === null ||
+    !ticket.event?.ticketPrice ||
+    ticket.event.ticketPrice <= 0;
+
+  // For free events, treat pending states as confirmed on the client so QR + access key are visible
+  const effectiveStatus =
+    isFreeEvent &&
+    (ticket.status === 'pending_payment' || ticket.status === 'payment_in_review')
+      ? 'confirmed'
+      : ticket.status;
+
   return (
     <View className="flex-1 bg-white">
       {/* Fixed header - back button stays on top when scrolling */}
@@ -332,42 +427,22 @@ export default function TicketScreen() {
           />
         }
       >
-      {/* Ticket Card - uses event ticket theme */}
-      <View className="mx-[20px] mb-3">
+      {/* Ticket Card - uses event ticket theme (ref for capture) */}
+      <View ref={ticketCardRef} className="mx-[20px] mb-3" collapsable={false}>
         <TicketPreview
           theme={ticket.event?.ticketTheme}
           event={ticket.event}
           preview={false}
           username={ticket.username}
           email={ticket.email}
-          status={ticket.status}
+          status={effectiveStatus}
           accessKey={ticket.accessKey}
           createdAt={ticket.createdAt}
         />
       </View>
 
-      {/* Download ticket button (opens QR / image for saving) */}
-      {ticket.status === 'confirmed' && getQrCodeUrl() && (
-        <View className="mx-[20px] mb-6">
-          <TouchableOpacity
-            className="py-2.5 rounded-lg bg-primary items-center"
-            onPress={() => {
-              const url = getQrCodeUrl();
-              if (!url) return;
-              Linking.openURL(url).catch(() => {
-                Alert.alert('Error', 'Unable to open ticket for download.');
-              });
-            }}
-          >
-            <Text className="text-white text-xs font-semibold">
-              Download Ticket
-            </Text>
-          </TouchableOpacity>
-        </View>
-      )}
-
       {/* Payment section - separate card below ticket */}
-      {(ticket.status === 'payment_in_review' || ticket.status === 'pending_payment') && (
+      {!isFreeEvent && (ticket.status === 'payment_in_review' || ticket.status === 'pending_payment') && (
         <View className="mx-3 mt-4 mb-6 bg-white rounded-2xl p-5 border border-gray-200">
         {ticket.status === 'payment_in_review' && (
           <View>
@@ -648,23 +723,29 @@ export default function TicketScreen() {
       </View>
 
       {/* Actions */}
-      {ticket.status === 'confirmed' && (
+      {effectiveStatus === 'confirmed' && (
         <View className="flex-row gap-3 px-3">
           <TouchableOpacity
             className="flex-1 bg-primary py-4 rounded-xl items-center"
-            onPress={() => {
-              Alert.alert('Download', 'Ticket download feature coming soon!');
-            }}
+            onPress={handleDownloadTicket}
+            disabled={downloadingTicket}
           >
-            <Text className="text-white text-base font-semibold">Download Ticket</Text>
+            {downloadingTicket ? (
+              <ActivityIndicator size="small" color="#FFFFFF" />
+            ) : (
+              <Text className="text-white text-base font-semibold">Download Ticket</Text>
+            )}
           </TouchableOpacity>
           <TouchableOpacity
             className="flex-1 bg-gray-100 border border-gray-200 py-4 rounded-xl items-center"
-            onPress={() => {
-              Alert.alert('Share', 'Ticket sharing feature coming soon!');
-            }}
+            onPress={handleShareTicket}
+            disabled={sharingTicket}
           >
-            <Text className="text-gray-900 text-base font-semibold">Share</Text>
+            {sharingTicket ? (
+              <ActivityIndicator size="small" color="#6B7280" />
+            ) : (
+              <Text className="text-gray-900 text-base font-semibold">Share</Text>
+            )}
           </TouchableOpacity>
         </View>
       )}

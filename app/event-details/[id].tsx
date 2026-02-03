@@ -630,7 +630,14 @@ export default function EventDetailsScreen() {
           >
             <Text className="text-gray-900 text-sm font-bold mb-2">Your Tickets ({userTickets.length})</Text>
             {userTickets.map((ticket: any, ticketIndex: number) => {
-              // Get status colors and info
+              // Determine if this ticket is for a free event
+              const isFreeEventForTicket =
+                (ticket as any)?.event?.price?.price === 'free' ||
+                (ticket as any)?.event?.price?.currency === null ||
+                !ticket.event?.ticketPrice ||
+                ticket.event.ticketPrice <= 0;
+
+              // Get status colors and info (treat free tickets as confirmed even if backend marks them pending)
               const getStatusInfo = (status: string) => {
                 switch (status) {
                   case 'confirmed':
@@ -696,7 +703,14 @@ export default function EventDetailsScreen() {
                 }
               };
 
-              const statusInfo = getStatusInfo(ticket.status);
+              const rawStatus = ticket.status;
+              const effectiveStatus =
+                isFreeEventForTicket &&
+                (rawStatus === 'pending_payment' || rawStatus === 'payment_in_review')
+                  ? 'confirmed'
+                  : rawStatus;
+
+              const statusInfo = getStatusInfo(effectiveStatus);
               const ticketId = ticket.id || ticket._id || `ticket-${ticketIndex}`;
 
               return (
