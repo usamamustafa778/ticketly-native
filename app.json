@@ -8,7 +8,7 @@
     "icon": "./assets/images/icon.png",
     "scheme": "spectrumlink",
     "userInterfaceStyle": "automatic",
-    "newArchEnabled": false,
+    "newArchEnabled": true,
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/adaptive-icon.png",
