@@ -1,12 +1,12 @@
 {
   "expo": {
     "owner": "uxamabt",
-    "name": "Booking App",
-    "slug": "bookingapp",
+    "name": "Spectrum Link",
+    "slug": "spectrumlink",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "bookingapp",
+    "scheme": "spectrumlink",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": false,
     "android": {
@@ -15,7 +15,7 @@
         "backgroundColor": "#ffffff"
       },
       "edgeToEdgeEnabled": true,
-      "package": "com.uxamabt.bookingapp",
+      "package": "com.uxamabt.spectrumlink",
       "usesCleartextTraffic": true,
       "compileSdkVersion": 34,
       "targetSdkVersion": 34,
