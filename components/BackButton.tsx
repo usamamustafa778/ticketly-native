@@ -21,13 +21,13 @@ export function BackButton({ onPress, variant = 'light', className = '' }: BackB
     <TouchableOpacity
       onPress={onPress}
       activeOpacity={0.7}
-      className={`w-10 h-10 rounded-full items-center justify-center ${
+      className={`w-7 h-7 rounded-full items-center justify-center ${
         isDark ? 'bg-black/50' : 'bg-gray-100'
       } ${className}`}
     >
       <MaterialIcons
         name="arrow-back"
-        size={24}
+        size={18}
         color={isDark ? '#FFFFFF' : '#111827'}
       />
     </TouchableOpacity>

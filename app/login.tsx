@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
-  TextInput,
   TouchableOpacity,
   ScrollView,
   KeyboardAvoidingView,
@@ -11,6 +10,8 @@ import {
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Modal } from '@/components/Modal';
+import { ButtonPrimary, ButtonSecondary } from '@/components/ui';
+import { DataInput } from '@/components/ui/DataInput';
 import { useAppStore } from '@/store/useAppStore';
 import { authAPI } from '@/lib/api/auth';
 import { getAccessToken, getRefreshToken, setTokens } from '@/lib/api/client';
@@ -334,69 +335,61 @@ export default function LoginScreen() {
             </View>
 
             <View className="w-full">
-            <Text className="text-gray-900 text-sm font-semibold mb-2">Full Name</Text>
-            <TextInput
-              className="bg-gray-50 border border-gray-200 rounded-xl py-3.5 px-4 text-gray-900 text-base mb-2"
+            <DataInput
+              label="Full Name"
               placeholder="e.g. Fatima Ali"
-              placeholderTextColor="#6B7280"
               value={name}
               onChangeText={setName}
               autoCapitalize="words"
+              className="mb-2"
             />
 
-            <Text className="text-gray-900 text-sm font-semibold mb-2">Email</Text>
-            <TextInput
-              className={`bg-gray-50 border rounded-xl py-3.5 px-4 text-gray-900 text-base mb-2 ${errorMessage ? 'border-[#EF4444]' : 'border-gray-200'}`}
+            <DataInput
+              label="Email"
               placeholder="e.g. fatimaali@gmail.com"
-              placeholderTextColor="#6B7280"
               value={email}
               onChangeText={(text) => {
                 setEmail(text);
-                // Clear error when user starts typing
                 if (errorMessage) setErrorMessage('');
               }}
+              error={errorMessage}
               keyboardType="email-address"
               autoCapitalize="none"
               autoComplete="email"
+              className="mb-2"
             />
-            {errorMessage && (
-              <Text className="text-[#EF4444] text-xs mb-3 mt-[-4px] px-1">{errorMessage}</Text>
-            )}
 
-            <Text className="text-gray-900 text-sm font-semibold mb-2">Password</Text>
-            <View className="relative mb-2">
-              <TextInput
-                className="bg-gray-50 border border-gray-200 rounded-xl py-3.5 px-4 pr-12 text-gray-900 text-base"
-                placeholder="At least 8 characters"
-                placeholderTextColor="#6B7280"
-                value={password}
-                onChangeText={setPassword}
-                secureTextEntry={!showSignupPassword}
-                autoCapitalize="none"
-              />
-              <TouchableOpacity
-                className="absolute right-4 top-3.5 p-1"
-                onPress={() => setShowSignupPassword(!showSignupPassword)}
-              >
-                <MaterialIcons
-                  name={showSignupPassword ? "visibility" : "visibility-off"}
-                  size={20}
-                  color="#9CA3AF"
-                />
-              </TouchableOpacity>
-            </View>
+            <DataInput
+              label="Password"
+              placeholder="At least 8 characters"
+              value={password}
+              onChangeText={setPassword}
+              secureTextEntry={!showSignupPassword}
+              autoCapitalize="none"
+              rightElement={
+                <TouchableOpacity
+                  onPress={() => setShowSignupPassword(!showSignupPassword)}
+                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                >
+                  <MaterialIcons
+                    name={showSignupPassword ? "visibility" : "visibility-off"}
+                    size={20}
+                    color="#9CA3AF"
+                  />
+                </TouchableOpacity>
+              }
+              className="mb-2"
+            />
 
-            <TouchableOpacity
-              className={`bg-primary py-4 rounded-xl items-center mb-3 ${loading ? 'opacity-60' : ''}`}
-              onPress={handleSignup}
+            <ButtonPrimary
+              fullWidth
+              loading={loading}
               disabled={loading}
+              onPress={handleSignup}
+              className="mb-3"
             >
-              {loading ? (
-                <ActivityIndicator color="#FFFFFF" />
-              ) : (
-                <Text className="text-white text-base font-semibold">Sign Up</Text>
-              )}
-            </TouchableOpacity>
+              Sign Up
+            </ButtonPrimary>
 
             <TouchableOpacity
               className="items-center mb-3"
@@ -411,8 +404,8 @@ export default function LoginScreen() {
               <Text className="text-primary text-sm font-semibold">Already have an account? Login</Text>
             </TouchableOpacity>
 
-            <TouchableOpacity
-              className="bg-gray-50 border border-gray-200 py-4 rounded-xl items-center"
+            <ButtonSecondary
+              fullWidth
               onPress={() => {
                 setLoginMethod(null);
                 setName('');
@@ -421,8 +414,8 @@ export default function LoginScreen() {
                 setErrorMessage('');
               }}
             >
-              <Text className="text-gray-900 text-base font-semibold">Back</Text>
-            </TouchableOpacity>
+              Back
+            </ButtonSecondary>
           </View>
           </View>
         </ScrollView>
@@ -448,63 +441,56 @@ export default function LoginScreen() {
             </View>
 
             <View className="w-full">
-            <Text className="text-gray-900 text-sm font-semibold mb-2">Email</Text>
-            <TextInput
-              className={`bg-gray-50 border rounded-xl py-3.5 px-4 text-gray-900 text-base mb-2 ${loginError ? 'border-[#EF4444]' : 'border-gray-200'}`}
+            <DataInput
+              label="Email"
               placeholder="e.g. fatimaali@gmail.com"
-              placeholderTextColor="#6B7280"
               value={email}
               onChangeText={(text) => {
                 setEmail(text);
-                // Clear error when user starts typing
                 if (loginError) setLoginError('');
               }}
+              error={loginError}
               keyboardType="email-address"
               autoCapitalize="none"
               autoComplete="email"
+              className="mb-2"
             />
 
-            <Text className="text-gray-900 text-sm font-semibold mb-2">Password</Text>
-            <View className="relative mb-2">
-              <TextInput
-                className={`bg-gray-50 border rounded-xl py-3.5 px-4 pr-12 text-gray-900 text-base ${loginError ? 'border-[#EF4444]' : 'border-gray-200'}`}
-                placeholder="Enter your password"
-                placeholderTextColor="#6B7280"
-                value={password}
-                onChangeText={(text) => {
-                  setPassword(text);
-                  // Clear error when user starts typing
-                  if (loginError) setLoginError('');
-                }}
-                secureTextEntry={!showPassword}
-                autoCapitalize="none"
-              />
-              <TouchableOpacity
-                className="absolute right-4 top-3.5 p-1"
-                onPress={() => setShowPassword(!showPassword)}
-              >
-                <MaterialIcons
-                  name={showPassword ? "visibility" : "visibility-off"}
-                  size={20}
-                  color="#9CA3AF"
-                />
-              </TouchableOpacity>
-            </View>
-            {loginError && (
-              <Text className="text-[#EF4444] text-xs mb-3 mt-[-4px] px-1">{loginError}</Text>
-            )}
+            <DataInput
+              label="Password"
+              placeholder="Enter your password"
+              value={password}
+              onChangeText={(text) => {
+                setPassword(text);
+                if (loginError) setLoginError('');
+              }}
+              error={loginError}
+              secureTextEntry={!showPassword}
+              autoCapitalize="none"
+              rightElement={
+                <TouchableOpacity
+                  onPress={() => setShowPassword(!showPassword)}
+                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                >
+                  <MaterialIcons
+                    name={showPassword ? "visibility" : "visibility-off"}
+                    size={20}
+                    color="#9CA3AF"
+                  />
+                </TouchableOpacity>
+              }
+              className="mb-2"
+            />
 
-            <TouchableOpacity
-              className={`bg-primary py-4 rounded-xl items-center mb-3 ${loading ? 'opacity-60' : ''}`}
-              onPress={handleEmailSubmit}
+            <ButtonPrimary
+              fullWidth
+              loading={loading}
               disabled={loading}
+              onPress={handleEmailSubmit}
+              className="mb-3"
             >
-              {loading ? (
-                <ActivityIndicator color="#FFFFFF" />
-              ) : (
-                <Text className="text-white text-base font-semibold">Login</Text>
-              )}
-            </TouchableOpacity>
+              Login
+            </ButtonPrimary>
 
             <TouchableOpacity
               className="items-center mb-3"
@@ -518,8 +504,8 @@ export default function LoginScreen() {
               <Text className="text-primary text-sm font-semibold">Don&apos;t have an account? Sign Up</Text>
             </TouchableOpacity>
 
-            <TouchableOpacity
-              className="bg-gray-50 border border-gray-200 py-4 rounded-xl items-center"
+            <ButtonSecondary
+              fullWidth
               onPress={() => {
                 setLoginMethod(null);
                 setEmail('');
@@ -527,8 +513,8 @@ export default function LoginScreen() {
                 setLoginError('');
               }}
             >
-              <Text className="text-gray-900 text-base font-semibold">Back</Text>
-            </TouchableOpacity>
+              Back
+            </ButtonSecondary>
           </View>
           </View>
         </ScrollView>
@@ -555,35 +541,29 @@ export default function LoginScreen() {
             </View>
 
             <View className="w-full">
-            <Text className="text-gray-900 text-sm font-semibold mb-2">OTP</Text>
-            <TextInput
-              className={`bg-gray-50 border rounded-xl py-3.5 px-4 text-gray-900 text-base mb-2 ${otpError ? 'border-[#EF4444]' : 'border-gray-200'}`}
+            <DataInput
+              label="OTP"
               placeholder="Enter 6-digit OTP"
-              placeholderTextColor="#6B7280"
               value={otp}
               onChangeText={(text) => {
                 setOtp(text);
-                // Clear error when user starts typing
                 if (otpError) setOtpError('');
               }}
+              error={otpError}
               keyboardType="number-pad"
               maxLength={6}
+              className="mb-2"
             />
-            {otpError && (
-              <Text className="text-[#EF4444] text-xs mb-3 mt-[-4px] px-1">{otpError}</Text>
-            )}
 
-            <TouchableOpacity
-              className={`bg-primary py-4 rounded-xl items-center mb-3 ${loading ? 'opacity-60' : ''}`}
-              onPress={handleOTPSubmit}
+            <ButtonPrimary
+              fullWidth
+              loading={loading}
               disabled={loading}
+              onPress={handleOTPSubmit}
+              className="mb-3"
             >
-              {loading ? (
-                <ActivityIndicator color="#FFFFFF" />
-              ) : (
-                <Text className="text-white text-base font-semibold">Verify OTP</Text>
-              )}
-            </TouchableOpacity>
+              Verify OTP
+            </ButtonPrimary>
 
             <TouchableOpacity
               className="items-center mb-3"
@@ -596,8 +576,8 @@ export default function LoginScreen() {
               <Text className="text-primary text-sm font-semibold">Resend OTP</Text>
             </TouchableOpacity>
 
-            <TouchableOpacity
-              className="bg-gray-50 border border-gray-200 py-4 rounded-xl items-center"
+            <ButtonSecondary
+              fullWidth
               onPress={() => {
                 setLoginMethod(null);
                 setOtpSent(false);
@@ -609,8 +589,8 @@ export default function LoginScreen() {
                 setOtpError('');
               }}
             >
-              <Text className="text-gray-900 text-base font-semibold">Back</Text>
-            </TouchableOpacity>
+              Back
+            </ButtonSecondary>
           </View>
           </View>
         </ScrollView>

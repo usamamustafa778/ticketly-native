@@ -14,6 +14,7 @@ export interface Ticket {
     image?: string;
     ticketPrice: number;
     phone?: string;
+    ticketTheme?: import('./events').TicketTheme;
     createdBy?: {
       _id: string;
       fullName: string;

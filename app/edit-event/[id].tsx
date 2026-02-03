@@ -21,6 +21,9 @@ import { eventsAPI, type Event } from '@/lib/api/events';
 import { Modal } from '@/components/Modal';
 import { BackButton } from '@/components/BackButton';
 import { EventDetailsSkeleton } from '@/components/EventDetailsSkeleton';
+import { ButtonPrimary } from '@/components/ui/ButtonPrimary';
+import { DataInput } from '@/components/ui/DataInput';
+import { DataSelection } from '@/components/ui/DataSelection';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import * as ImagePicker from 'expo-image-picker';
@@ -78,8 +81,6 @@ export default function EditEventScreen() {
   const [step, setStep] = useState<1 | 2>(1);
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [showTimePicker, setShowTimePicker] = useState(false);
-  const [showGenderModal, setShowGenderModal] = useState(false);
-  const [showCurrencyModal, setShowCurrencyModal] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [uploadingImage, setUploadingImage] = useState(false);
@@ -362,9 +363,9 @@ export default function EditEventScreen() {
     return (
       <View className="flex-1 bg-white items-center justify-center p-10">
         <Text className="text-[#EF4444] text-lg mb-6">{errorMessage}</Text>
-        <TouchableOpacity className="bg-primary py-3 px-6 rounded-xl" onPress={() => router.back()}>
-          <Text className="text-white text-base font-semibold">Go Back</Text>
-        </TouchableOpacity>
+        <ButtonPrimary onPress={() => router.back()}>
+          Go Back
+        </ButtonPrimary>
       </View>
     );
   }
@@ -447,16 +448,14 @@ export default function EditEventScreen() {
               )}
             </TouchableOpacity>
 
-            <Text className={labelClass}>Event Name</Text>
-            <TextInput
-              className={`${inputRow} mb-1 text-sm ${errors.eventName ? 'border-[#EF4444]' : ''}`}
+            <DataInput
+              label="Event Name"
               placeholder="name"
-              placeholderTextColor="#6B7280"
               value={formData.eventName}
               onChangeText={(v) => handleInputChange('eventName', v)}
-              style={{ color: '#111827' }}
+              error={errors.eventName}
+              className="mb-3"
             />
-            {errors.eventName ? <Text className="text-[#EF4444] text-xs mb-3">{errors.eventName}</Text> : null}
 
             <View className="flex-row gap-2 mb-3">
               <View className="flex-1">
@@ -554,201 +553,92 @@ export default function EditEventScreen() {
               />
             </View>
 
-            <Text className={labelClass}>Gender</Text>
-            <TouchableOpacity
-              className={`${inputRow} mb-1 ${errors.genderSelection ? 'border-[#EF4444]' : ''}`}
-              onPress={() => setShowGenderModal(true)}
-            >
-              <View className={iconWrap}>
-                <MaterialIcons name="person-outline" size={18} color="#9CA3AF" />
-              </View>
-              <Text className="text-gray-900 text-sm">{formData.genderSelection}</Text>
-              <MaterialIcons name="expand-more" size={20} color="#9CA3AF" />
-            </TouchableOpacity>
-            {errors.genderSelection ? <Text className="text-[#EF4444] text-xs mb-3">{errors.genderSelection}</Text> : null}
+            <DataSelection
+              label="Gender"
+              value={formData.genderSelection}
+              onSelect={(v) => handleInputChange('genderSelection', v)}
+              options={GENDER_OPTIONS.map((opt) => ({ value: opt, label: opt }))}
+              error={errors.genderSelection}
+              className="mb-3"
+            />
 
-            <RNModal visible={showGenderModal} transparent animationType="slide" onRequestClose={() => setShowGenderModal(false)}>
-              <Pressable className="flex-1 justify-end bg-black/60" onPress={() => setShowGenderModal(false)}>
-                <Pressable className="bg-white rounded-t-2xl border-t border-gray-200 px-4 pb-8 pt-2" onPress={(e) => e.stopPropagation()}>
-                  <View className="items-center pt-2 pb-3">
-                    <View className="w-10 h-1 rounded-full bg-gray-300" />
-                  </View>
-                  <Text className="text-gray-900 text-lg font-semibold mb-4">Gender Selection</Text>
-                  {GENDER_OPTIONS.map((opt) => {
-                    const isSelected = formData.genderSelection === opt;
-                    return (
-                      <TouchableOpacity
-                        key={opt}
-                        className={`flex-row items-center py-3.5 px-4 rounded-xl mb-2 ${isSelected ? 'bg-primary/10 border border-primary' : 'bg-gray-100 border border-transparent'}`}
-                        onPress={() => {
-                          handleInputChange('genderSelection', opt);
-                          setShowGenderModal(false);
-                        }}
-                        activeOpacity={0.8}
-                      >
-                        <View className="w-10 h-10 rounded-full bg-gray-200 items-center justify-center mr-3">
-                          <MaterialIcons name="person-outline" size={18} color="#9CA3AF" />
-                        </View>
-                        <Text className="text-gray-900 text-base font-medium flex-1">{opt}</Text>
-                        {isSelected && (
-                          <View className="w-6 h-6 rounded-full bg-primary items-center justify-center">
-                            <MaterialIcons name="check" size={14} color="#FFF" />
-                          </View>
-                        )}
-                      </TouchableOpacity>
-                    );
-                  })}
-                </Pressable>
-              </Pressable>
-            </RNModal>
-
-            <Text className={labelClass}>Description <Text className="text-[#6B7280]">(optional)</Text></Text>
-            <TextInput
-              className="bg-gray-50 border border-gray-200 rounded-md py-2 px-3 text-gray-900 text-sm min-h-[72px] mb-6"
+            <DataInput
+              label="Description (optional)"
               placeholder="description"
-              placeholderTextColor="#6B7280"
               value={formData.description}
               onChangeText={(v) => handleInputChange('description', v)}
               multiline
               textAlignVertical="top"
+              className="mb-6"
             />
 
-            <TouchableOpacity
+            <ButtonPrimary
+              fullWidth
               onPress={handleNext}
               disabled={!step1Valid}
-              className={`w-full py-2.5 rounded-md overflow-hidden ${!step1Valid ? 'opacity-50' : ''}`}
-              style={{ backgroundColor: '#DC2626', shadowColor: '#DC2626', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.3, shadowRadius: 4, elevation: 4 }}
             >
-              <Text className="text-white text-center text-base font-semibold">Next</Text>
-            </TouchableOpacity>
+              Next
+            </ButtonPrimary>
           </>
         )}
 
         {step === 2 && (
           <>
-            <Text className={labelClass}>Event Type</Text>
-            <View className="flex-row gap-2 mb-4">
-              <TouchableOpacity
-                onPress={() => handleInputChange('eventType', 'paid')}
-                className={`flex-1 py-2.5 px-3 rounded-md border-2 flex-row items-center justify-center gap-2 ${
-                  formData.eventType === 'paid' ? 'border-primary bg-primary/10' : 'border-gray-200 bg-gray-50'
-                }`}
-              >
-                {formData.eventType === 'paid' ? (
-                  <View className="w-5 h-5 rounded-full bg-primary items-center justify-center">
-                    <MaterialIcons name="check" size={14} color="#FFF" />
-                  </View>
-                ) : (
-                  <View className="w-5 h-5 rounded-full border-2 border-[#6B7280]" />
-                )}
-                <Text className="text-gray-900 font-medium">Paid Event</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                onPress={() => handleInputChange('eventType', 'free')}
-                className={`flex-1 py-2.5 px-3 rounded-md border-2 flex-row items-center justify-center gap-2 ${
-                  formData.eventType === 'free' ? 'border-primary bg-primary/10' : 'border-gray-200 bg-gray-50'
-                }`}
-              >
-                {formData.eventType === 'free' ? (
-                  <View className="w-5 h-5 rounded-full bg-primary items-center justify-center">
-                    <MaterialIcons name="check" size={14} color="#FFF" />
-                  </View>
-                ) : (
-                  <View className="w-5 h-5 rounded-full border-2 border-[#6B7280]" />
-                )}
-                <Text className="text-gray-900 font-medium">Free Event</Text>
-              </TouchableOpacity>
-            </View>
+            <DataSelection<'paid' | 'free'>
+              label="Event Type"
+              value={formData.eventType}
+              onSelect={(v) => handleInputChange('eventType', v)}
+              options={[
+                { value: 'paid', label: 'Paid Event' },
+                { value: 'free', label: 'Free Event' },
+              ]}
+              className="mb-4"
+            />
 
             {formData.eventType === 'paid' && (
               <>
-                <Text className={labelClass}>Cost Per Ticket</Text>
-                <View className="flex-row items-center gap-2 mb-1">
-                  <View className="w-8 h-8 rounded-full bg-[#374151] items-center justify-center">
-                    <MaterialIcons name="account-balance-wallet" size={18} color="#9CA3AF" />
-                  </View>
-                  <TextInput
-                    className={`flex-1 bg-[#1F1F1F] border rounded-md py-2 px-3 text-white text-sm ${errors.ticketPrice ? 'border-[#EF4444]' : 'border-[#374151]'}`}
-                    placeholder="e.g. 600"
-                    placeholderTextColor="#6B7280"
-                    value={formData.ticketPrice}
-                    onChangeText={(v) => handleInputChange('ticketPrice', v)}
-                    keyboardType="numeric"
-                  />
-                </View>
-                {errors.ticketPrice ? <Text className="text-[#EF4444] text-xs mb-3">{errors.ticketPrice}</Text> : null}
-                <Text className={labelClass}>Select Currency</Text>
-                <TouchableOpacity
-                  className="flex-row items-center gap-2 bg-[#1F1F1F] border border-[#374151] rounded-md py-2 px-3 mb-4"
-                  onPress={() => setShowCurrencyModal(true)}
-                  activeOpacity={0.8}
-                >
-                  <View className="w-8 h-8 rounded-full bg-[#374151] items-center justify-center">
-                    <Text className="text-lg">{CURRENCY_OPTIONS[0]?.flag ?? '🇵🇰'}</Text>
-                  </View>
-                  <Text className="text-white text-base flex-1">{formData.currency}</Text>
-                  <MaterialIcons name="expand-more" size={20} color="#9CA3AF" />
-                </TouchableOpacity>
-
-                <RNModal visible={showCurrencyModal} transparent animationType="slide" onRequestClose={() => setShowCurrencyModal(false)}>
-                  <Pressable className="flex-1 justify-end bg-black/60" onPress={() => setShowCurrencyModal(false)}>
-                    <Pressable className="bg-white rounded-t-2xl border-t border-gray-200 px-4 pb-8 pt-2" onPress={(e) => e.stopPropagation()}>
-                      <View className="items-center pt-2 pb-3">
-                        <View className="w-10 h-1 rounded-full bg-gray-300" />
-                      </View>
-                      <Text className="text-gray-900 text-lg font-semibold mb-4">Select Currency</Text>
-                      {CURRENCY_OPTIONS.map((opt) => (
-                        <TouchableOpacity
-                          key={opt.code}
-                          className={`flex-row items-center py-3.5 px-4 rounded-xl mb-2 ${formData.currency === opt.code ? 'bg-primary/10 border border-primary' : 'bg-gray-100 border border-transparent'}`}
-                          onPress={() => {
-                            handleInputChange('currency', opt.code);
-                            setShowCurrencyModal(false);
-                          }}
-                          activeOpacity={0.8}
-                        >
-                          <View className="w-10 h-10 rounded-full bg-gray-200 items-center justify-center mr-3">
-                            <Text className="text-xl">{opt.flag}</Text>
-                          </View>
-                          <View className="flex-1">
-                            <Text className="text-gray-900 text-base font-medium">{opt.code}</Text>
-                            <Text className="text-[#9CA3AF] text-sm">{opt.label}</Text>
-                          </View>
-                          {formData.currency === opt.code && (
-                            <View className="w-6 h-6 rounded-full bg-primary items-center justify-center">
-                              <MaterialIcons name="check" size={14} color="#FFF" />
-                            </View>
-                          )}
-                        </TouchableOpacity>
-                      ))}
-                    </Pressable>
-                  </Pressable>
-                </RNModal>
-
-                <Text className={labelClass}>Total Tickets</Text>
-                <TextInput
-                  className={`bg-gray-50 border rounded-md py-2 px-3 text-gray-900 text-sm mb-1 ${errors.totalTickets ? 'border-[#EF4444]' : 'border-gray-200'}`}
+                <DataInput
+                  label="Cost Per Ticket"
+                  placeholder="e.g. 600"
+                  value={formData.ticketPrice}
+                  onChangeText={(v) => handleInputChange('ticketPrice', v)}
+                  error={errors.ticketPrice}
+                  keyboardType="numeric"
+                  className="mb-3"
+                />
+                <DataSelection
+                  label="Select Currency"
+                  value={formData.currency}
+                  onSelect={(v) => handleInputChange('currency', v)}
+                  options={CURRENCY_OPTIONS.map((c) => ({
+                    value: c.code,
+                    label: `${c.code} - ${c.label}`,
+                    subtitle: c.flag,
+                  }))}
+                  getLabel={(v) => CURRENCY_OPTIONS.find((c) => c.code === v)?.label ?? v}
+                  className="mb-4"
+                />
+                <DataInput
+                  label="Total Tickets"
                   placeholder="e.g. 100"
-                  placeholderTextColor="#6B7280"
                   value={formData.totalTickets}
                   onChangeText={(v) => handleInputChange('totalTickets', v)}
+                  error={errors.totalTickets}
                   keyboardType="numeric"
+                  className="mb-4"
                 />
-                {errors.totalTickets ? <Text className="text-[#EF4444] text-xs mb-4">{errors.totalTickets}</Text> : null}
               </>
             )}
 
-            <TouchableOpacity
+            <ButtonPrimary
+              fullWidth
               onPress={handleSubmit}
               disabled={saving || !step2Valid}
-              className={`w-full py-2.5 rounded-md bg-primary items-center justify-center mt-2 ${saving || !step2Valid ? 'opacity-60' : ''}`}
+              loading={saving}
+              className="mt-2"
             >
-              {saving ? (
-                <ActivityIndicator color="#FFF" />
-              ) : (
-                <Text className="text-white text-base font-semibold">Update Event</Text>
-              )}
-            </TouchableOpacity>
+              Update Event
+            </ButtonPrimary>
           </>
         )}
       </ScrollView>

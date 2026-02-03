@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   View,
   Text,
@@ -7,12 +7,13 @@ import {
   Image,
   ActivityIndicator,
   RefreshControl,
+  Platform,
   Modal as RNModal,
   Pressable,
+  PanResponder,
 } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useBottomPadding } from '@/hooks/useBottomPadding';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { authAPI, type PublicUserProfile } from '@/lib/api/auth';
 import { CACHE_KEYS, getCached, setCached } from '@/lib/cache';
@@ -74,8 +75,40 @@ export default function UserProfileScreen() {
   const [activeTab, setActiveTab] = useState<TabKey>('created');
   const [showImageViewer, setShowImageViewer] = useState(false);
 
-  // Dynamic bottom padding: Gestures (insets.bottom > 0) = safe area + 20px; Buttons (insets.bottom === 0) = 10px
-  const bottomPadding = useBottomPadding();
+  // No bottom tab bar on user page (outside tabs folder), so no extra bottom padding needed
+  const bottomPadding = 20;
+
+  const TAB_ORDER: TabKey[] = ['created', 'joined', 'liked'];
+  const activeTabRef = useRef(activeTab);
+  activeTabRef.current = activeTab;
+
+  const panResponder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => false,
+      onStartShouldSetPanResponderCapture: () => false,
+      onMoveShouldSetPanResponder: (_, gestureState) => {
+        const { dx, dy } = gestureState;
+        return Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > 35;
+      },
+      onMoveShouldSetPanResponderCapture: (_, gestureState) => {
+        const { dx, dy } = gestureState;
+        return Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > 35;
+      },
+      onPanResponderTerminationRequest: () => false,
+      onPanResponderRelease: (_, gestureState) => {
+        const { dx } = gestureState;
+        const SWIPE_THRESHOLD = 40;
+        const currentTab = activeTabRef.current;
+        if (dx < -SWIPE_THRESHOLD) {
+          const idx = TAB_ORDER.indexOf(currentTab);
+          if (idx < TAB_ORDER.length - 1) setActiveTab(TAB_ORDER[idx + 1]);
+        } else if (dx > SWIPE_THRESHOLD) {
+          const idx = TAB_ORDER.indexOf(currentTab);
+          if (idx > 0) setActiveTab(TAB_ORDER[idx - 1]);
+        }
+      },
+    })
+  ).current;
 
   const fetchProfile = useCallback(
     async (showRefreshing = false) => {
@@ -163,7 +196,7 @@ export default function UserProfileScreen() {
   }
 
   return (
-    <View className="flex-1 bg-white">
+    <View className="flex-1 bg-white" {...panResponder.panHandlers}>
       {/* Fixed back button - stays on top when scrolling */}
       <View
         style={{
@@ -180,13 +213,13 @@ export default function UserProfileScreen() {
         data={currentEvents}
         style={{ flex: 1 }}
         contentContainerStyle={{
-          paddingTop: insets.top + 48,
+          paddingTop: insets.top + 58,
           paddingBottom: bottomPadding,
           paddingHorizontal: 2,
         }}
         keyExtractor={(item) => item.id}
         numColumns={2}
-        columnWrapperStyle={{ gap: 2, marginBottom: 2 }}
+        columnWrapperStyle={{ gap: 4, marginBottom: 4 }}
         renderItem={({ item }) => (
           <View className="flex-1">
             <EventCard
@@ -237,22 +270,9 @@ export default function UserProfileScreen() {
                 <Text className="text-primary text-base font-semibold mt-1">{profile.companyName}</Text>
               )}
             </View>
-            <View className="flex-row justify-around px-16 py-2">
-              <View className="items-center">
-                <Text className="text-gray-900 text-base font-bold mb-0.5">{createdEvents.length}</Text>
-                <Text className="text-[#9CA3AF] text-[10px]">Created</Text>
-              </View>
-              <View className="items-center">
-                <Text className="text-gray-900 text-base font-bold mb-0.5">{joinedEvents.length}</Text>
-                <Text className="text-[#9CA3AF] text-[10px]">Joined</Text>
-              </View>
-              <View className="items-center">
-                <Text className="text-gray-900 text-base font-bold mb-0.5">{likedEvents.length}</Text>
-                <Text className="text-[#9CA3AF] text-[10px]">Liked</Text>
-              </View>
-            </View>
-            <View className="mx-10">
-              <View className="py-2 mb-3 translate-y-[-2px] bg-white">
+       
+            <View className="mx-10 ">
+              <View className="py-2  translate-y-[-2px] bg-white">
                 <TabsRow
                   items={[
                     { key: 'created', label: 'Created Events' },

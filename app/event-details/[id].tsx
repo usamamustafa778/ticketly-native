@@ -11,20 +11,33 @@ import {
   Modal as RNModal,
   Pressable,
   Animated,
+  Dimensions,
+  Platform,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useAppStore } from '@/store/useAppStore';
 import { eventsAPI, type Event } from '@/lib/api/events';
 import { ticketsAPI } from '@/lib/api/tickets';
 import { authAPI } from '@/lib/api/auth';
+import { CACHE_KEYS, getCached, setCached } from '@/lib/cache';
 import { Modal } from '@/components/Modal';
 import { BackButton } from '@/components/BackButton';
 import { EventDetailsSkeleton } from '@/components/EventDetailsSkeleton';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
+import AnimatedReanimated, {
+  useSharedValue,
+  useAnimatedStyle,
+  withRepeat,
+  withSequence,
+  withTiming,
+  cancelAnimation,
+} from 'react-native-reanimated';
 import { getEventImageUrl } from '@/lib/utils/imageUtils';
 
 export default function EventDetailsScreen() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const { id } = useLocalSearchParams<{ id: string }>();
   const user = useAppStore((state) => state.user);
   const setUser = useAppStore((state) => state.setUser);
@@ -55,8 +68,11 @@ export default function EventDetailsScreen() {
   const [loadingTickets, setLoadingTickets] = useState(false);
   const scrollViewRef = useRef<ScrollView>(null);
   const [ticketsSectionY, setTicketsSectionY] = useState<number>(0);
+  const [showImageViewer, setShowImageViewer] = useState(false);
+  const [sBackgroundFetching, setIsBackgroundFetching] = useState(false);
+  const loadingLineProgress = useSharedValue(0);
 
-  // Fetch event from API
+  // Fetch event from API - public data: cache first (works for logged-in and logged-out users)
   const fetchEvent = async (showRefreshing = false) => {
     if (!id) {
       setError('Event ID is required');
@@ -64,37 +80,75 @@ export default function EventDetailsScreen() {
       return;
     }
 
-    try {
-      if (showRefreshing) {
-        setRefreshing(true);
-      } else {
-        setLoading(true);
+    let hadCache = false;
+    if (!showRefreshing) {
+      const cached = await getCached<{ event: Event; isLiked: boolean; likeCount: number }>(CACHE_KEYS.EVENT_BY_ID(id));
+      if (cached?.event) {
+        hadCache = true;
+        setEvent(cached.event);
+        setIsLiked(cached.isLiked);
+        setLikeCount(cached.likeCount);
+        setError(null);
+        setLoading(false);
       }
+    }
+
+    try {
+      if (showRefreshing) setRefreshing(true);
+      else if (!hadCache) setLoading(true);
+      if (hadCache) setIsBackgroundFetching(true);
       setError(null);
       const response = await eventsAPI.getEventById(id);
 
       if (response.success && response.event) {
-        // Transform backend event to match frontend structure
         const eventData = response.event as any;
         const transformedEvent: Event = {
           ...eventData,
           _id: eventData.id || eventData._id,
         };
+        await setCached(CACHE_KEYS.EVENT_BY_ID(id), {
+          event: transformedEvent,
+          isLiked: !!eventData.isLiked,
+          likeCount: eventData.likeCount ?? 0,
+        });
         setEvent(transformedEvent);
         setIsLiked(!!eventData.isLiked);
         setLikeCount(eventData.likeCount ?? 0);
-      } else {
+      } else if (!hadCache) {
         setError('Event not found');
       }
     } catch (err: any) {
       console.error('Error fetching event:', err);
       const errorMessage = err.response?.data?.message || err.message || 'Failed to load event';
-      setError(errorMessage);
+      if (!hadCache) setError(errorMessage);
     } finally {
       setLoading(false);
       setRefreshing(false);
+      setIsBackgroundFetching(false);
     }
   };
+
+  // Animated loading line - uses Reanimated for smooth 60fps on mobile (runs on UI thread)
+  useEffect(() => {
+    if (!sBackgroundFetching) {
+      cancelAnimation(loadingLineProgress);
+      loadingLineProgress.value = 0;
+      return;
+    }
+    loadingLineProgress.value = withRepeat(
+      withSequence(
+        withTiming(1, { duration: 1200 }),
+        withTiming(0, { duration: 0 })
+      ),
+      -1
+    );
+    return () => cancelAnimation(loadingLineProgress);
+  }, [sBackgroundFetching, loadingLineProgress]);
+
+  const screenWidth = Dimensions.get('window').width;
+  const loadingLineAnimatedStyle = useAnimatedStyle(() => ({
+    width: loadingLineProgress.value * screenWidth * 0.4,
+  }));
 
   useEffect(() => {
     fetchEvent();
@@ -217,13 +271,13 @@ export default function EventDetailsScreen() {
   if (error || !event) {
     return (
       <View className="flex-1 bg-white">
-        <View className="flex-1 items-center justify-center p-10">
-          <Text className="text-[#EF4444] text-lg mb-6">{error || 'Event not found'}</Text>
+        <View className="flex-1 items-center justify-center p-6">
+          <Text className="text-[#EF4444] text-sm mb-4">{error || 'Event not found'}</Text>
           <TouchableOpacity
-            className="bg-primary py-3 px-6 rounded-xl"
+            className="bg-primary py-2 px-4 rounded-lg"
             onPress={() => router.back()}
           >
-            <Text className="text-white text-base font-semibold">Go Back</Text>
+            <Text className="text-white text-xs font-semibold">Go Back</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -292,7 +346,19 @@ export default function EventDetailsScreen() {
 
         setUserTicketId(response.ticket.id);
         setIsRegistered(true);
-        setModalMessage('Ticket created successfully! Please submit payment to confirm your ticket.');
+
+        const isFreeEvent =
+          (event as any)?.price?.price === 'free' ||
+          (event as any)?.price?.currency === null ||
+          !event?.ticketPrice ||
+          event.ticketPrice <= 0 ||
+          response.ticket.status === 'confirmed';
+
+        setModalMessage(
+          isFreeEvent
+            ? 'Your free ticket is confirmed! You can view your QR code in the ticket screen.'
+            : 'Ticket created successfully! Please submit payment to confirm your ticket.'
+        );
         setShowModal(true);
       }
     } catch (error: any) {
@@ -342,8 +408,21 @@ export default function EventDetailsScreen() {
     return timeString;
   };
 
+  
+
   return (
     <View className="flex-1 bg-white">
+      {/* Fixed back button - stays on top when scrolling */}
+      <View
+        style={{
+          position: 'absolute',
+          top: insets.top + 8,
+          left: 16,
+          zIndex: 10,
+        }}
+      >
+        <BackButton variant="dark" onPress={() => router.back()} />
+      </View>
       <ScrollView
         ref={scrollViewRef}
         className="flex-1"
@@ -358,46 +437,64 @@ export default function EventDetailsScreen() {
           />
         }
       >
-        {/* Header Image */}
-        <View className="w-full h-[300px] relative">
+        {/* Header Image - tap to view full screen */}
+        <TouchableOpacity
+          className="w-full h-[300px] relative"
+          activeOpacity={1}
+          onPress={() => setShowImageViewer(true)}
+        >
           <Image
             source={{ uri: getEventImageUrl(event) || 'https://via.placeholder.com/400' }}
             className="w-full h-full"
             resizeMode="cover"
           />
-          <BackButton
-            variant="dark"
-            className="absolute top-[50px] left-5"
-            onPress={() => router.back()}
-          />
-        </View>
+        </TouchableOpacity>
 
-        {/* Event Info Card */}
-        <View className="bg-white rounded-t-3xl p-3 -mt-5 border-t border-gray-200">
-          <View className="flex-row justify-between items-center mb-6">
-            <Text className="text-gray-900 text-2xl font-bold flex-1 mr-3">{event.title}</Text>
+        {/* Event Info Card - Compact */}
+        <View className="bg-white rounded-t-3xl px-3 py-2.5 -mt-5 border-t border-gray-200 overflow-hidden">
+          {/* Loading line animation when fetching in background */}
+          {sBackgroundFetching && (
+            <View style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 2, backgroundColor: '#E5E7EB', zIndex: 1, overflow: 'hidden' }}>
+              <AnimatedReanimated.View
+                style={[
+                  {
+                    position: 'absolute',
+                    left: 0,
+                    top: 0,
+                    height: 2,
+                    backgroundColor: '#DC2626',
+                    zIndex: 10,
+                    ...(Platform.OS === 'android' && { elevation: 5 }),
+                  },
+                  loadingLineAnimatedStyle,
+                ]}
+              />
+            </View>
+          )}
+          <View className="flex-row justify-between items-center mb-3">
+            <Text className="text-gray-900 text-lg font-bold flex-1 mr-2">{event.title}</Text>
             <TouchableOpacity
-              className="flex-row items-center gap-1.5 bg-gray-100 py-2 px-3 rounded-xl"
+              className="flex-row items-center gap-1 bg-gray-100 py-1 px-2 rounded-lg"
               onPress={handleLike}
               activeOpacity={0.7}
             >
               <Animated.View style={{ transform: [{ scale: likeScale }] }}>
                 <MaterialIcons
                   name={isLiked ? "favorite" : "favorite-border"}
-                  size={20}
+                  size={16}
                   color={isLiked ? "#EF4444" : "#9CA3AF"}
                 />
               </Animated.View>
-              <Text className="text-gray-700 text-sm font-semibold">{likeCount}</Text>
+              <Text className="text-gray-700 text-xs font-semibold">{likeCount}</Text>
             </TouchableOpacity>
           </View>
 
           {/* Event Date & Time */}
-          <View className="flex-row mb-5 items-start">
-            <MaterialIcons name="calendar-today" size={20} color="#6B7280" style={{ marginRight: 12, marginTop: 2 }} />
+          <View className="flex-row mb-2 items-start">
+            <MaterialIcons name="calendar-today" size={16} color="#6B7280" style={{ marginRight: 8, marginTop: 1 }} />
             <View className="flex-1">
-              <Text className="text-gray-900 text-sm font-semibold mb-1">Event Date & Time</Text>
-              <Text className="text-gray-700 text-sm mb-0.5">
+              <Text className="text-gray-900 text-xs font-semibold mb-0.5">Event Date & Time</Text>
+              <Text className="text-gray-700 text-xs">
                 {formatDate(event.date)}, {formatTime(event.time)}
               </Text>
             </View>
@@ -405,32 +502,32 @@ export default function EventDetailsScreen() {
 
           {/* Location (optional) */}
           {event.location ? (
-            <View className="flex-row mb-5 items-start">
-              <MaterialIcons name="location-on" size={20} color="#6B7280" style={{ marginRight: 12, marginTop: 2 }} />
+            <View className="flex-row mb-2 items-start">
+              <MaterialIcons name="location-on" size={16} color="#6B7280" style={{ marginRight: 8, marginTop: 1 }} />
               <View className="flex-1">
-                <Text className="text-gray-900 text-sm font-semibold mb-1">Location</Text>
-                <Text className="text-gray-700 text-sm mb-0.5">{event.location}</Text>
+                <Text className="text-gray-900 text-xs font-semibold mb-0.5">Location</Text>
+                <Text className="text-gray-700 text-xs">{event.location}</Text>
               </View>
             </View>
           ) : null}
 
           {/* Gender (optional) */}
           {event.gender ? (
-            <View className="flex-row mb-5 items-start">
-              <MaterialIcons name="person-outline" size={20} color="#6B7280" style={{ marginRight: 12, marginTop: 2 }} />
+            <View className="flex-row mb-2 items-start">
+              <MaterialIcons name="person-outline" size={16} color="#6B7280" style={{ marginRight: 8, marginTop: 1 }} />
               <View className="flex-1">
-                <Text className="text-gray-900 text-sm font-semibold mb-1">Gender</Text>
-                <Text className="text-gray-700 text-sm mb-0.5 capitalize">{event.gender}</Text>
+                <Text className="text-gray-900 text-xs font-semibold mb-0.5">Gender</Text>
+                <Text className="text-gray-700 text-xs capitalize">{event.gender}</Text>
               </View>
             </View>
           ) : null}
 
           {/* Price: event.price { price, currency } or free; fallback ticketPrice */}
-          <View className="flex-row mb-5 items-start">
-            <MaterialIcons name="confirmation-number" size={20} color="#6B7280" style={{ marginRight: 12, marginTop: 2 }} />
+          <View className="flex-row mb-2 items-start">
+            <MaterialIcons name="confirmation-number" size={16} color="#6B7280" style={{ marginRight: 8, marginTop: 1 }} />
             <View className="flex-1">
-              <Text className="text-gray-900 text-sm font-semibold mb-1">Ticket Price</Text>
-              <Text className="text-gray-700 text-sm mb-0.5">
+              <Text className="text-gray-900 text-xs font-semibold mb-0.5">Ticket Price</Text>
+              <Text className="text-gray-700 text-xs">
                 {event.price?.price === 'free' || event.price?.currency === null
                   ? 'Free'
                   : event.price?.currency
@@ -440,7 +537,7 @@ export default function EventDetailsScreen() {
                       : 'Free'}
               </Text>
               {event.totalTickets != null && event.totalTickets > 0 && (
-                <Text className="text-gray-600 text-xs mt-1">
+                <Text className="text-gray-600 text-[10px] mt-0.5">
                   {event.totalTickets} tickets available
                 </Text>
               )}
@@ -448,27 +545,31 @@ export default function EventDetailsScreen() {
           </View>
 
           {/* Register / Get More Tickets Button */}
-          <TouchableOpacity
-            className="py-4 rounded-xl items-center mt-2 bg-primary"
+          {!isRegistered && 
+          (  <TouchableOpacity
+            className="py-2.5 rounded-lg items-center mt-2 bg-primary"
             onPress={handleRegister}
             disabled={creatingTicket}
           >
             {creatingTicket ? (
               <ActivityIndicator size="small" color="#FFFFFF" />
             ) : (
-              <Text className="text-white text-base font-bold">
+              <Text className="text-white text-xs font-bold">
                 {isRegistered ? 'Get More Tickets' : 'Register Now'}
               </Text>
             )}
           </TouchableOpacity>
+          )
+          }
+         
 
         </View>
 
         {/* Event Description Section (optional) */}
         {event.description ? (
-          <View className="p-5 border-t border-gray-200 bg-white">
-            <Text className="text-gray-900 text-xl font-bold mb-3">Event Description</Text>
-            <Text className="text-gray-700 text-sm leading-6 mb-3">
+          <View className="px-3 py-2 border-t border-gray-200 bg-white">
+            <Text className="text-gray-900 text-sm font-bold mb-1.5">Event Description</Text>
+            <Text className="text-gray-700 text-xs leading-5">
               {event.description}
             </Text>
           </View>
@@ -476,18 +577,18 @@ export default function EventDetailsScreen() {
 
         {/* Contact Information */}
         {(event.email || event.phone) && (
-          <View className="p-5 border-t border-gray-200 bg-white">
-            <Text className="text-gray-900 text-xl font-bold mb-3">Contact Information</Text>
+          <View className="px-3 py-2 border-t border-gray-200 bg-white">
+            <Text className="text-gray-900 text-sm font-bold mb-1.5">Contact Information</Text>
             {event.email && (
-              <View className="flex-row items-center mb-2">
-                <MaterialIcons name="email" size={20} color="#6B7280" style={{ marginRight: 12 }} />
-                <Text className="text-gray-700 text-sm">{event.email}</Text>
+              <View className="flex-row items-center mb-1">
+                <MaterialIcons name="email" size={14} color="#6B7280" style={{ marginRight: 8 }} />
+                <Text className="text-gray-700 text-xs">{event.email}</Text>
               </View>
             )}
             {event.phone && (
               <View className="flex-row items-center">
-                <MaterialIcons name="phone" size={20} color="#6B7280" style={{ marginRight: 12 }} />
-                <Text className="text-gray-700 text-sm">{event.phone}</Text>
+                <MaterialIcons name="phone" size={14} color="#6B7280" style={{ marginRight: 8 }} />
+                <Text className="text-gray-700 text-xs">{event.phone}</Text>
               </View>
             )}
           </View>
@@ -495,8 +596,8 @@ export default function EventDetailsScreen() {
 
         {/* Organized By: createdBy or organizerName */}
         {(event.createdBy || event.organizerName) && (
-          <View className="p-5 border-t border-gray-200 bg-white">
-            <Text className="text-gray-900 text-xl font-bold mb-3">Organized By</Text>
+          <View className="px-3 py-2 border-t border-gray-200 bg-white">
+            <Text className="text-gray-900 text-sm font-bold mb-1.5">Organized By</Text>
             <TouchableOpacity
               onPress={() => {
                 const organizerId = (event.createdBy as any)?._id || (event as any).organizerId;
@@ -505,15 +606,15 @@ export default function EventDetailsScreen() {
               activeOpacity={0.7}
               disabled={!((event.createdBy as any)?._id || (event as any).organizerId)}
             >
-              <Text className="text-gray-800 text-base font-semibold text-primary">
+              <Text className="text-gray-800 text-xs font-semibold text-primary">
                 {event.createdBy?.fullName ?? event.organizerName ?? '—'}
               </Text>
             </TouchableOpacity>
             {event.createdBy?.email && (
-              <Text className="text-gray-600 text-sm mt-1">{event.createdBy.email}</Text>
+              <Text className="text-gray-600 text-[10px] mt-0.5">{event.createdBy.email}</Text>
             )}
             {event.email && !event.createdBy?.email && (
-              <Text className="text-gray-600 text-sm mt-1">{event.email}</Text>
+              <Text className="text-gray-600 text-[10px] mt-0.5">{event.email}</Text>
             )}
           </View>
         )}
@@ -521,13 +622,13 @@ export default function EventDetailsScreen() {
         {/* User's Tickets Section */}
         {user && userTickets.length > 0 && (
           <View
-            className="p-5 border-t border-gray-200 bg-white"
+            className="px-3 py-2 border-t border-gray-200 bg-white"
             onLayout={(event) => {
               const { y } = event.nativeEvent.layout;
               setTicketsSectionY(y);
             }}
           >
-            <Text className="text-gray-900 text-xl font-bold mb-4">Your Tickets ({userTickets.length})</Text>
+            <Text className="text-gray-900 text-sm font-bold mb-2">Your Tickets ({userTickets.length})</Text>
             {userTickets.map((ticket: any, ticketIndex: number) => {
               // Get status colors and info
               const getStatusInfo = (status: string) => {
@@ -601,27 +702,27 @@ export default function EventDetailsScreen() {
               return (
                 <TouchableOpacity
                   key={ticketId}
-                  className={`${statusInfo.bgColor} ${statusInfo.borderColor} rounded-xl p-4 mb-3 border-2`}
+                  className={`${statusInfo.bgColor} ${statusInfo.borderColor} rounded-lg p-2.5 mb-2 border`}
                   onPress={() => router.push(`/ticket/${ticketId}`)}
                   activeOpacity={0.7}
                 >
                   <View className="flex-row items-start justify-between">
-                    <View className="flex-1 mr-3">
+                    <View className="flex-1 mr-2 min-w-0">
                       {/* Ticket Header with Status */}
-                      <View className="flex-row items-center justify-between mb-3">
-                        <View className="flex-row items-center flex-1">
+                      <View className="flex-row items-center justify-between mb-2">
+                        <View className="flex-row items-center flex-1 min-w-0">
                           <MaterialIcons
                             name={statusInfo.icon as any}
-                            size={20}
+                            size={16}
                             color={statusInfo.iconColor}
-                            style={{ marginRight: 8 }}
+                            style={{ marginRight: 6 }}
                           />
-                          <Text className="text-gray-900 text-sm font-bold">
+                          <Text className="text-gray-900 text-xs font-bold" numberOfLines={1}>
                             Ticket #{ticketId.slice(-8).toUpperCase()}
                           </Text>
                         </View>
-                        <View className={`${statusInfo.badgeColor} px-3 py-1 rounded-full`}>
-                          <Text className="text-white text-[10px] font-bold uppercase">
+                        <View className={`${statusInfo.badgeColor} px-2 py-0.5 rounded-full ml-1`}>
+                          <Text className="text-white text-[9px] font-bold uppercase">
                             {statusInfo.label}
                           </Text>
                         </View>
@@ -629,22 +730,22 @@ export default function EventDetailsScreen() {
 
                       {/* Ticket Details */}
                       <View>
-                        <View className="flex-row items-center mb-2">
-                          <MaterialIcons name="email" size={14} color="#6B7280" style={{ marginRight: 8 }} />
-                          <Text className="text-gray-700 text-xs flex-1" numberOfLines={1}>
+                        <View className="flex-row items-center mb-1">
+                          <MaterialIcons name="email" size={12} color="#6B7280" style={{ marginRight: 6 }} />
+                          <Text className="text-gray-700 text-[10px] flex-1" numberOfLines={1}>
                             {ticket.email}
                           </Text>
                         </View>
-                        <View className="flex-row items-center mb-2">
-                          <MaterialIcons name="phone" size={14} color="#6B7280" style={{ marginRight: 8 }} />
-                          <Text className="text-gray-700 text-xs">
+                        <View className="flex-row items-center mb-1">
+                          <MaterialIcons name="phone" size={12} color="#6B7280" style={{ marginRight: 6 }} />
+                          <Text className="text-gray-700 text-[10px]">
                             {ticket.phone}
                           </Text>
                         </View>
                         {ticket.createdAt && (
                           <View className="flex-row items-center">
-                            <MaterialIcons name="calendar-today" size={14} color="#6B7280" style={{ marginRight: 8 }} />
-                            <Text className="text-gray-600 text-[10px]">
+                            <MaterialIcons name="calendar-today" size={12} color="#6B7280" style={{ marginRight: 6 }} />
+                            <Text className="text-gray-600 text-[9px]">
                               {new Date(ticket.createdAt).toLocaleDateString('en-US', {
                                 month: 'short',
                                 day: 'numeric',
@@ -658,7 +759,7 @@ export default function EventDetailsScreen() {
 
                     {/* Arrow Icon */}
                     <View className="justify-center">
-                      <MaterialIcons name="chevron-right" size={24} color="#6B7280" />
+                      <MaterialIcons name="chevron-right" size={18} color="#6B7280" />
                     </View>
                   </View>
                 </TouchableOpacity>
@@ -733,17 +834,17 @@ export default function EventDetailsScreen() {
         animationType="fade"
         onRequestClose={() => { setShowPhoneModal(false); setPhoneInput(''); }}
       >
-        <Pressable className="flex-1 bg-black/70 justify-center items-center p-5" onPress={() => { setShowPhoneModal(false); setPhoneInput(''); }}>
-          <Pressable className="bg-white rounded-2xl border border-gray-200 p-6 w-full max-w-[400px]" onPress={(e) => e.stopPropagation()}>
-            <View className="items-center pt-1 pb-3">
-              <View className="w-10 h-1 rounded-full bg-gray-300" />
+        <Pressable className="flex-1 bg-black/70 justify-center items-center p-3" onPress={() => { setShowPhoneModal(false); setPhoneInput(''); }}>
+          <Pressable className="bg-white rounded-xl border border-gray-200 p-4 w-full max-w-[400px]" onPress={(e) => e.stopPropagation()}>
+            <View className="items-center pt-1 pb-2">
+              <View className="w-8 h-0.5 rounded-full bg-gray-300" />
             </View>
-            <Text className="text-gray-900 text-xl font-bold mb-2 text-center">Phone Number Required</Text>
-            <Text className="text-gray-600 text-base leading-6 mb-4 text-center">
-              Please enter your phone number to create a ticket
+            <Text className="text-gray-900 text-base font-bold mb-1.5 text-center">Phone Number Required</Text>
+            <Text className="text-gray-600 text-xs leading-5 mb-3 text-center">
+              Enter your phone number to create a ticket
             </Text>
             <TextInput
-              className="bg-gray-50 text-gray-900 px-4 py-3 rounded-xl mb-4 border border-gray-200"
+              className="bg-gray-50 text-gray-900 text-xs px-3 py-2 rounded-lg mb-3 border border-gray-200"
               placeholder="Enter your phone number"
               placeholderTextColor="#9CA3AF"
               value={phoneInput}
@@ -751,26 +852,55 @@ export default function EventDetailsScreen() {
               keyboardType="phone-pad"
               autoFocus
             />
-            <View className="flex-row gap-3">
+            <View className="flex-row gap-2">
               <TouchableOpacity
-                className="flex-1 py-3.5 rounded-xl items-center bg-gray-100 border border-gray-200"
+                className="flex-1 py-2 rounded-lg items-center bg-gray-100 border border-gray-200"
                 onPress={() => { setShowPhoneModal(false); setPhoneInput(''); }}
               >
-                <Text className="text-gray-900 text-base font-semibold">Cancel</Text>
+                <Text className="text-gray-900 text-xs font-semibold">Cancel</Text>
               </TouchableOpacity>
               <TouchableOpacity
-                className="flex-1 py-3.5 rounded-xl items-center bg-primary"
+                className="flex-1 py-2 rounded-lg items-center bg-primary"
                 onPress={handlePhoneSubmit}
                 disabled={creatingTicket}
               >
                 {creatingTicket ? (
                   <ActivityIndicator size="small" color="#FFFFFF" />
                 ) : (
-                  <Text className="text-white text-base font-semibold">Submit</Text>
+                  <Text className="text-white text-xs font-semibold">Submit</Text>
                 )}
               </TouchableOpacity>
             </View>
           </Pressable>
+        </Pressable>
+      </RNModal>
+
+      {/* Event Image Full View */}
+      <RNModal
+        visible={showImageViewer}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowImageViewer(false)}
+      >
+        <Pressable
+          className="flex-1 bg-black justify-center items-center"
+          onPress={() => setShowImageViewer(false)}
+        >
+          <Image
+            source={{ uri: getEventImageUrl(event) || 'https://via.placeholder.com/400' }}
+            style={{
+              width: Dimensions.get('window').width,
+              height: Dimensions.get('window').height,
+            }}
+            resizeMode="contain"
+          />
+          <TouchableOpacity
+            className="absolute right-4 bg-white/20 w-7 h-7 rounded-full items-center justify-center"
+            style={{ top: insets.top + 8 }}
+            onPress={() => setShowImageViewer(false)}
+          >
+            <MaterialIcons name="close" size={18} color="#FFFFFF" />
+          </TouchableOpacity>
         </Pressable>
       </RNModal>
     </View>
