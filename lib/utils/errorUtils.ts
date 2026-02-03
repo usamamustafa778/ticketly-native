@@ -1,11 +1,15 @@
 /**
  * Format API/axios error or API response object into a full readable error string for display.
  * Includes message, validation details, status code, etc.
+ * If error.isSessionExpired (set by API client when refresh token fails), returns login message.
  */
 export function formatApiError(error: unknown, fallback = 'An error occurred'): string {
   if (!error || typeof error !== 'object') return fallback;
 
   const err = error as any;
+  if (err.isSessionExpired || err?.message?.toLowerCase?.().includes('login again')) {
+    return 'Your session has expired. Please login again.';
+  }
   const parts: string[] = [];
 
   // Axios error: error.response.data, or API response object

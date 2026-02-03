@@ -17,49 +17,18 @@ const defaultOverlay = 'rgba(255,255,255,0.08)';
 
 const WEIGHT_MULTIPLIER: Record<PatternWeight, number> = {
   sharper: 0.6,
-  sharp: 0.8,
-  thin: 1,
-  medium: 1.2,
-  thick: 1.5,
-  thicker: 1.9,
+  sharp: 2,
+  thin: 3.5,
+  medium: 6,
+  thick: 7.5,
+  thicker: 9,
 };
 
+// Round path numbers to avoid "Invalid number formatting character" on Android Expo Go
+const r = (n: number) => Math.round(n * 100) / 100;
+
 /** Organic (Music) - flowing sound-wave inspired waves + soft blobs */
-function OrganicBlobs({ width, height, overlayColor, sizeMult }: { width: number; height: number; overlayColor: string; sizeMult: number }) {
-  const strokeW = 2 * sizeMult;
-  const op = 0.5;
-  return (
-    <Svg width={width} height={height} style={StyleSheet.absoluteFill} pointerEvents="none">
-      <Path
-        d={`M -10 ${height * 0.2} Q ${width * 0.2} ${height * 0.35} ${width * 0.4} ${height * 0.15} T ${width * 0.8} ${height * 0.3} T ${width + 10} ${height * 0.2}`}
-        fill="none"
-        stroke={overlayColor}
-        strokeWidth={strokeW}
-        opacity={op}
-      />
-      <Path
-        d={`M -10 ${height * 0.5} Q ${width * 0.25} ${height * 0.35} ${width * 0.5} ${height * 0.55} T ${width * 0.85} ${height * 0.4} T ${width + 10} ${height * 0.55}`}
-        fill="none"
-        stroke={overlayColor}
-        strokeWidth={strokeW}
-        opacity={op}
-      />
-      <Path
-        d={`M -10 ${height * 0.78} Q ${width * 0.3} ${height * 0.6} ${width * 0.55} ${height * 0.85} T ${width * 0.9} ${height * 0.7} T ${width + 10} ${height * 0.82}`}
-        fill="none"
-        stroke={overlayColor}
-        strokeWidth={strokeW}
-        opacity={op}
-      />
-      <Path
-        // Avoid "Z" close command for better Android compatibility; close explicitly.
-        d={`M ${width * 0.15} ${height + 10} C ${width * 0.15} ${height * 0.6} ${width * 0.5} ${height * 0.4} ${width * 0.5} ${height * 0.7} C ${width * 0.85} ${height * 0.65} ${width * 0.85} ${height + 10} L ${width * 0.15} ${height + 10}`}
-        fill={overlayColor}
-        opacity={0.35}
-      />
-    </Svg>
-  );
-}
+
 
 /** Flowing liquid waves - smooth bezier paths with fill */
 function FluidWaves({ width, height, overlayColor, sizeMult }: { width: number; height: number; overlayColor: string; sizeMult: number }) {
@@ -145,28 +114,29 @@ function DynamicBlobs({ width, height, overlayColor, sizeMult }: { width: number
   return (
     <Svg width={width} height={height} style={StyleSheet.absoluteFill} pointerEvents="none">
       <Path
-        d={`M -20 ${height * 0.2} C ${width * 0.15} ${height * 0.4} ${width * 0.45} ${height * 0.05} ${width * 0.7} ${height * 0.25} C ${width * 0.95} ${height * 0.45} ${width + 20} ${height * 0.15} ${width + 20} ${height * 0.35}`}
+        d={`M -20 ${r(height * 0.2)} C ${r(width * 0.15)} ${r(height * 0.4)} ${r(width * 0.45)} ${r(height * 0.05)} ${r(width * 0.7)} ${r(height * 0.25)} C ${r(width * 0.95)} ${r(height * 0.45)} ${r(width + 20)} ${r(height * 0.15)} ${r(width + 20)} ${r(height * 0.35)}`}
         fill="none"
         stroke={overlayColor}
         strokeWidth={strokeW}
         opacity={op}
       />
       <Path
-        d={`M -20 ${height * 0.55} C ${width * 0.25} ${height * 0.35} ${width * 0.5} ${height * 0.7} ${width * 0.75} ${height * 0.45} C ${width} ${height * 0.65} ${width + 20} ${height * 0.5} ${width + 20} ${height * 0.65}`}
+        d={`M -20 ${r(height * 0.55)} C ${r(width * 0.25)} ${r(height * 0.35)} ${r(width * 0.5)} ${r(height * 0.7)} ${r(width * 0.75)} ${r(height * 0.45)} C ${r(width)} ${r(height * 0.65)} ${r(width + 20)} ${r(height * 0.5)} ${r(width + 20)} ${r(height * 0.65)}`}
         fill="none"
         stroke={overlayColor}
         strokeWidth={strokeW}
         opacity={op}
       />
       <Path
-        d={`M -20 ${height * 0.88} C ${width * 0.3} ${height * 0.65} ${width * 0.6} ${height * 0.95} ${width + 20} ${height * 0.78}`}
+        d={`M -20 ${r(height * 0.88)} C ${r(width * 0.3)} ${r(height * 0.65)} ${r(width * 0.6)} ${r(height * 0.95)} ${r(width + 20)} ${r(height * 0.78)}`}
         fill="none"
         stroke={overlayColor}
         strokeWidth={strokeW}
         opacity={op}
       />
       <Path
-        d={`M ${width * 0.2} ${height} C ${width * 0.2} ${height * 0.5} ${width * 0.5} ${height * 0.35} ${width * 0.5} ${height * 0.65} C ${width * 0.8} ${height * 0.6} ${width * 0.8} ${height} L ${width * 0.2} ${height}`}
+        // Avoid "L" on Android (Invalid number formatting character). Close with relative l.
+        d={`M ${r(width * 0.2)} ${r(height)} C ${r(width * 0.2)} ${r(height * 0.5)} ${r(width * 0.5)} ${r(height * 0.35)} ${r(width * 0.5)} ${r(height * 0.65)} C ${r(width * 0.8)} ${r(height * 0.6)} ${r(width * 0.8)} ${r(height)} l ${r(width * 0.2 - width * 0.8)} 0`}
         fill={overlayColor}
         opacity={0.38}
       />
@@ -273,26 +243,7 @@ function SoftMesh({ width, height, overlayColor, sizeMult }: { width: number; he
 }
 
 /** Vector - flowing angular but softened */
-function VectorSoft({ width, height, overlayColor, sizeMult }: { width: number; height: number; overlayColor: string; sizeMult: number }) {
-  const strokeW = 2 * sizeMult;
-  const op = 0.5;
-  return (
-    <Svg width={width} height={height} style={StyleSheet.absoluteFill} pointerEvents="none">
-      <Path
-        d={`M ${width * 0.1} ${height} C ${width * 0.1} ${height * 0.5} ${width * 0.5} ${height * 0.4} ${width * 0.5} ${height * 0.6} C ${width * 0.9} ${height * 0.55} ${width * 0.9} ${height} L ${width * 0.1} ${height}`}
-        fill={overlayColor}
-        opacity={0.35}
-      />
-      <Path
-        d={`M 0 ${height * 0.5} C ${width * 0.3} ${height * 0.3} ${width * 0.7} ${height * 0.4} ${width} ${height * 0.5}`}
-        fill="none"
-        stroke={overlayColor}
-        strokeWidth={strokeW}
-        opacity={op}
-      />
-    </Svg>
-  );
-}
+
 
 export function BackgroundPattern({
   element,
@@ -315,9 +266,7 @@ export function BackgroundPattern({
 
   const SvgPattern = () => {
     switch (effectiveElement) {
-      case 'organic':
-        return <OrganicBlobs width={width} height={height} overlayColor={overlayColor} sizeMult={sizeMult} />;
-
+      
       case 'fluid':
         return <FluidWaves width={width} height={height} overlayColor={overlayColor} sizeMult={sizeMult} />;
 
@@ -336,9 +285,7 @@ export function BackgroundPattern({
       case 'mesh':
         return <SoftMesh width={width} height={height} overlayColor={overlayColor} sizeMult={sizeMult} />;
 
-      case 'vector':
-        return <VectorSoft width={width} height={height} overlayColor={overlayColor} sizeMult={sizeMult} />;
-
+      
       default:
         return null;
     }

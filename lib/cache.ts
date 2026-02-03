@@ -10,6 +10,9 @@ export const CACHE_KEYS = {
   EVENTS_APPROVED: `${CACHE_PREFIX}events_approved`,
   EVENT_BY_ID: (id: string) => `${CACHE_PREFIX}event_${id}`,
   USER_PROFILE_BY_ID: (id: string) => `${CACHE_PREFIX}user_${id}`,
+  TICKET_BY_ID: (id: string) => `${CACHE_PREFIX}ticket_${id}`,
+  /** GET /api/tickets/my response – list of user's tickets */
+  TICKETS_MY: `${CACHE_PREFIX}tickets_my`,
 } as const;
 
 export async function getCached<T>(key: string): Promise<T | null> {

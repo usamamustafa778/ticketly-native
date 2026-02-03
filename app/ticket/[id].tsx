@@ -22,6 +22,7 @@ import * as Sharing from 'expo-sharing';
 import { BackButton } from '@/components/BackButton';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { API_BASE_URL } from '@/lib/config';
+import { CACHE_KEYS, getCached, setCached } from '@/lib/cache';
 import * as Linking from 'expo-linking';
 import { getEventImageUrl } from '@/lib/utils/imageUtils';
 import { TicketPreview } from '@/components/TicketPreview';
@@ -111,9 +112,16 @@ export default function TicketScreen() {
         return;
       }
 
+      // Show cached ticket immediately so UI is visible in background while fetching
+      const cached = await getCached<Ticket>(CACHE_KEYS.TICKET_BY_ID(id));
+      if (cached) {
+        setTicket(cached);
+        setError(null);
+      }
+
       try {
         setLoading(true);
-        setError(null);
+        if (!cached) setError(null);
         const response = await ticketsAPI.getTicketById(id);
 
         if (response.success && response.ticket) {
@@ -126,15 +134,14 @@ export default function TicketScreen() {
             paymentScreenshotUrl: response.ticket.paymentScreenshotUrl,
           });
           setTicket(response.ticket);
-          // Don't set screenshotUri from ticket - let getPaymentScreenshotUrl() handle it
-          // This ensures we use the same logic as profile image (prefer URL, handle localhost, etc.)
+          await setCached(CACHE_KEYS.TICKET_BY_ID(id), response.ticket);
         } else {
-          setError('Ticket not found');
+          if (!cached) setError('Ticket not found');
         }
       } catch (err: any) {
         console.error('Error fetching ticket:', err);
         const errorMessage = err.response?.data?.message || err.message || 'Failed to load ticket';
-        setError(errorMessage);
+        if (!cached) setError(errorMessage);
       } finally {
         setLoading(false);
       }
@@ -150,6 +157,7 @@ export default function TicketScreen() {
       const response = await ticketsAPI.getTicketById(id);
       if (response.success && response.ticket) {
         setTicket(response.ticket);
+        await setCached(CACHE_KEYS.TICKET_BY_ID(id), response.ticket);
       }
     } catch (err) {
       console.error('Error refreshing ticket:', err);
@@ -273,9 +281,16 @@ export default function TicketScreen() {
       return;
     }
     if (!ticketCardRef.current) return;
+    setDownloadingTicket(true);
+    let capturedUri: string | null = null;
     try {
-      setDownloadingTicket(true);
-      // On Android 13+, request only photo permission so we don't trigger AUDIO permission error
+      capturedUri = await captureRef(ticketCardRef, {
+        format: 'jpg',
+        quality: 0.95,
+        result: 'tmpfile',
+        width: 800,
+      });
+
       const { status } =
         Platform.OS === 'android'
           ? await MediaLibrary.requestPermissionsAsync(false, ['photo'])
@@ -288,15 +303,32 @@ export default function TicketScreen() {
         );
         return;
       }
-      const uri = await captureRef(ticketCardRef, {
-        format: 'jpg',
-        quality: 0.95,
-        result: 'tmpfile',
-        width: 800,
-      });
-      await MediaLibrary.saveToLibraryAsync(uri);
+      await MediaLibrary.saveToLibraryAsync(capturedUri);
       Alert.alert('Saved', 'Ticket saved to your photo library.');
     } catch (err: any) {
+      const msg = err?.message ?? '';
+      const isExpoGoOrRestricted =
+        msg.includes('Expo Go') ||
+        msg.includes('expo-media-library') ||
+        msg.includes('media library') ||
+        msg.includes('development build');
+
+      // When saveToLibraryAsync fails (e.g. Expo Go), open share sheet so user can save via "Save image" / "Save to Photos"
+      if (capturedUri && (isExpoGoOrRestricted || msg.includes('requestPermissionsAsync'))) {
+        try {
+          const isAvailable = await Sharing.isAvailableAsync();
+          if (isAvailable) {
+            const eventTitle = ticket?.event?.title || 'My ticket';
+            await Sharing.shareAsync(capturedUri, {
+              mimeType: 'image/jpeg',
+              dialogTitle: `${eventTitle} – Save ticket `,
+            });
+            return;
+          }
+        } catch (e) {
+          console.error('Download fallback share error:', e);
+        }
+      }
       console.error('Download ticket error:', err);
       Alert.alert('Error', err?.message || 'Could not save ticket to gallery.');
     } finally {
@@ -339,7 +371,8 @@ export default function TicketScreen() {
     }
   };
 
-  if (loading) {
+  // Show full-screen loader only when loading and no cached ticket to display in background
+  if (loading && !ticket) {
     return (
       <View className="flex-1 bg-white">
         <View className="flex-1 items-center justify-center p-10">

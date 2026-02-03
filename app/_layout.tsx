@@ -15,6 +15,8 @@ try {
 
 import { useColorScheme } from '@/hooks/useColorScheme';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
+import { setOnSessionExpired } from '@/lib/api/sessionExpired';
+import { useAppStore } from '@/store/useAppStore';
 
 const BRAND_PRIMARY = '#DC2626'; // red (primary)
 
@@ -34,6 +36,14 @@ export default function RootLayout() {
       return () => clearTimeout(timer);
     }
   }, [loaded, fontError]);
+
+  // When access token is expired and refresh fails, clear user and ask for login (all APIs using apiClient get this)
+  useEffect(() => {
+    setOnSessionExpired(() => {
+      useAppStore.getState().logout();
+    });
+    return () => setOnSessionExpired(null);
+  }, []);
 
   // If font loading failed, log but continue
   if (fontError) {

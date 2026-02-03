@@ -20,6 +20,7 @@ import { eventsAPI, type Event } from '@/lib/api/events';
 import { ticketsAPI } from '@/lib/api/tickets';
 import { CACHE_KEYS, getCached, setCached } from '@/lib/cache';
 import { BackButton } from '@/components/BackButton';
+import { EventDetailsSkeleton } from '@/components/EventDetailsSkeleton';
 import { ButtonPrimary } from '@/components/ui/ButtonPrimary';
 import { Label } from '@/components/ui/Label';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
@@ -371,14 +372,7 @@ export default function CreatedEventDetailsScreen() {
   ];
 
   if (loading && !event) {
-    return (
-      <View className="flex-1 bg-white">
-        <View className="flex-1 items-center justify-center p-10">
-          <ActivityIndicator size="large" color="#DC2626" />
-          <Text className="text-gray-700 text-base mt-4">Loading event...</Text>
-        </View>
-      </View>
-    );
+    return <EventDetailsSkeleton />;
   }
 
   if (error || !event) {

@@ -267,13 +267,6 @@ export default function EditEventScreen() {
     }
     setErrors({});
 
-    const isAuthenticated = useAppStore.getState().isAuthenticated;
-    if (!isAuthenticated) {
-      setErrorMessage('Please login to update an event.');
-      setShowErrorModal(true);
-      return;
-    }
-
     if (!eventId) {
       setErrorMessage('Event ID is missing');
       setShowErrorModal(true);

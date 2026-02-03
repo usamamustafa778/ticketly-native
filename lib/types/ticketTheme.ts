@@ -36,14 +36,11 @@ export const PATTERN_WEIGHTS: { id: PatternWeight; name: string; description: st
 
 export const BACKGROUND_ELEMENTS: { id: BackgroundElement; name: string; style: string }[] = [
   { id: 'none', name: 'None', style: 'No pattern' },
-  { id: 'organic', name: 'Organic', style: 'Music' },
   { id: 'fluid', name: 'Fluid', style: 'Liquid' },
   { id: 'grid', name: 'Grid', style: 'Tech' },
   { id: 'geometric', name: 'Geometric', style: 'Technical' },
   { id: 'mesh', name: 'Mesh', style: 'Art' },
   { id: 'gradient_mesh', name: 'Gradient Mesh', style: 'Aesthetic' },
-  { id: 'vector', name: 'Vector', style: 'Sports' },
-  { id: 'dynamic', name: 'Dynamic', style: 'Kinetic' },
 ];
 
 /** White background, primary dotted borders - no thumbnail-derived colors */

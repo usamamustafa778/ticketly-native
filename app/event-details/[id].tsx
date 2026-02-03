@@ -18,7 +18,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useAppStore } from '@/store/useAppStore';
 import { eventsAPI, type Event } from '@/lib/api/events';
-import { ticketsAPI } from '@/lib/api/tickets';
+import { ticketsAPI, type GetMyTicketsResponse } from '@/lib/api/tickets';
 import { authAPI } from '@/lib/api/auth';
 import { CACHE_KEYS, getCached, setCached } from '@/lib/cache';
 import { Modal } from '@/components/Modal';
@@ -156,11 +156,12 @@ export default function EventDetailsScreen() {
 
   const onRefresh = async () => {
     await fetchEvent(true);
-    // Also refresh user tickets
+    // Also refresh user tickets and save to cache
     if (event && user && id) {
       try {
         const response = await ticketsAPI.getMyTickets();
         if (response.success && response.tickets) {
+          await setCached<GetMyTicketsResponse>(CACHE_KEYS.TICKETS_MY, response);
           const eventTickets = response.tickets.filter(
             (ticket: any) => ticket.event?._id === id || ticket.event?.id === id || ticket.eventId === id
           );
@@ -173,21 +174,29 @@ export default function EventDetailsScreen() {
     }
   };
 
-  // Fetch user's tickets for this event
+  // Fetch user's tickets for this event – show cached list in background while fetching (like events)
   useEffect(() => {
     const fetchUserTickets = async () => {
       if (!event || !user || !id) return;
+
+      const cached = await getCached<GetMyTicketsResponse>(CACHE_KEYS.TICKETS_MY);
+      if (cached?.tickets && Array.isArray(cached.tickets)) {
+        const eventTickets = cached.tickets.filter(
+          (ticket: any) => ticket.event?._id === id || ticket.event?.id === id || ticket.eventId === id
+        );
+        setUserTickets(eventTickets);
+        setIsRegistered(eventTickets.length > 0);
+      }
 
       try {
         setLoadingTickets(true);
         const response = await ticketsAPI.getMyTickets();
         if (response.success && response.tickets) {
-          // Filter tickets for this specific event
+          await setCached<GetMyTicketsResponse>(CACHE_KEYS.TICKETS_MY, response);
           const eventTickets = response.tickets.filter(
             (ticket: any) => ticket.event?._id === id || ticket.event?.id === id || ticket.eventId === id
           );
           setUserTickets(eventTickets);
-          // Check if user is registered (has tickets)
           setIsRegistered(eventTickets.length > 0);
         }
       } catch (error) {
@@ -331,10 +340,11 @@ export default function EventDetailsScreen() {
           // Don't block success if profile refresh fails
         }
 
-        // Refresh tickets list
+        // Refresh tickets list and save to cache
         try {
           const ticketsResponse = await ticketsAPI.getMyTickets();
           if (ticketsResponse.success && ticketsResponse.tickets) {
+            await setCached<GetMyTicketsResponse>(CACHE_KEYS.TICKETS_MY, ticketsResponse);
             const eventTickets = ticketsResponse.tickets.filter(
               (ticket: any) => ticket.event?._id === id || ticket.event?.id === id || ticket.eventId === id
             );

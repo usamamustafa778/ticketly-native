@@ -1,6 +1,7 @@
 import axios, { AxiosInstance, AxiosError, InternalAxiosRequestConfig } from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { API_BASE_URL } from '../config';
+import { triggerSessionExpired } from './sessionExpired';
 
 const ACCESS_TOKEN_KEY = 'accessToken';
 const REFRESH_TOKEN_KEY = 'refreshToken';
@@ -102,7 +103,14 @@ apiClient.interceptors.response.use(
 
     const originalRequest = error.config as InternalAxiosRequestConfig & { _retry?: boolean };
 
-    // If error is 401 and we haven't retried yet
+    // Don't try refresh for auth routes that don't use access token (login, signup, verify-otp)
+    const url = originalRequest?.url ?? '';
+    const isAuthRoute = /\/auth\/(login|signup|verify-otp)/.test(url);
+    if (isAuthRoute) {
+      return Promise.reject(error);
+    }
+
+    // If error is 401 and we haven't retried yet → refresh token and retry (all other APIs that need login)
     if (error.response?.status === 401 && !originalRequest._retry) {
       if (isRefreshing) {
         // If already refreshing, queue this request
@@ -128,26 +136,30 @@ apiClient.interceptors.response.use(
       if (!refreshToken) {
         processQueue(error, null);
         isRefreshing = false;
-        // Clear tokens and redirect to login
         await AsyncStorage.multiRemove([ACCESS_TOKEN_KEY, REFRESH_TOKEN_KEY]);
+        (error as any).isSessionExpired = true;
+        triggerSessionExpired();
         return Promise.reject(error);
       }
 
       try {
-        // Call refresh token API
         const response = await axios.post(`${API_BASE_URL}/auth/refresh-token`, {
           refreshToken,
         });
 
-        const { accessToken: newAccessToken, refreshToken: newRefreshToken } = response.data;
+        const data = response?.data ?? {};
+        const newAccessToken = data.accessToken ?? data.data?.accessToken;
+        const newRefreshToken = data.refreshToken ?? data.data?.refreshToken;
 
-        // Save new tokens
+        if (!newAccessToken || !newRefreshToken) {
+          throw new Error('Invalid refresh response');
+        }
+
         await AsyncStorage.multiSet([
           [ACCESS_TOKEN_KEY, newAccessToken],
           [REFRESH_TOKEN_KEY, newRefreshToken],
         ]);
 
-        // Update the original request header
         if (originalRequest.headers) {
           originalRequest.headers.Authorization = `Bearer ${newAccessToken}`;
         }
@@ -156,12 +168,16 @@ apiClient.interceptors.response.use(
         isRefreshing = false;
 
         return apiClient(originalRequest);
-      } catch (refreshError) {
+      } catch (refreshError: any) {
         processQueue(refreshError as AxiosError, null);
         isRefreshing = false;
-        // Clear tokens and redirect to login
         await AsyncStorage.multiRemove([ACCESS_TOKEN_KEY, REFRESH_TOKEN_KEY]);
-        return Promise.reject(refreshError);
+        const err = refreshError?.response?.data?.message
+          ? new Error(refreshError.response.data.message)
+          : refreshError;
+        (err as any).isSessionExpired = true;
+        triggerSessionExpired();
+        return Promise.reject(err);
       }
     }
 

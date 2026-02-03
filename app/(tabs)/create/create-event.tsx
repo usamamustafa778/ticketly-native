@@ -306,12 +306,6 @@ export default function CreateEventScreen() {
     }
     setErrors({});
 
-    const isAuthenticated = useAppStore.getState().isAuthenticated;
-    if (!isAuthenticated) {
-      setShowLoginModal(true);
-      return;
-    }
-
     setLoading(true);
     try {
       // Use relative path for API (dynamic backend URL)
@@ -378,7 +372,9 @@ export default function CreateEventScreen() {
         setShowErrorModal(true);
       }
     } catch (error: any) {
-      setErrorMessage(formatApiError(error, 'Failed to create event. Please try again.'));
+      setErrorMessage(
+        error?.isSessionExpired ? 'Your session has expired. Please login again.' : formatApiError(error, 'Failed to create event. Please try again.')
+      );
       setShowErrorModal(true);
     } finally {
       setLoading(false);
