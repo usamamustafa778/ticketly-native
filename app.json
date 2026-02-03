@@ -37,14 +37,19 @@
     },
     "plugins": [
       "expo-router",
+      "expo-font",
       [
         "expo-build-properties",
         {
           "android": {
+            "newArchEnabled": true,
             "usesCleartextTraffic": true,
             "minSdkVersion": 23,
             "compileSdkVersion": 34,
             "targetSdkVersion": 34
+          },
+          "ios": {
+            "newArchEnabled": true
           }
         }
       ],
