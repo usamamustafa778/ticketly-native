@@ -14,12 +14,7 @@
         "foregroundImage": "./assets/images/adaptive-icon.png",
         "backgroundColor": "#ffffff"
       },
-      "edgeToEdgeEnabled": true,
       "package": "com.uxamabt.spectrumlink",
-      "usesCleartextTraffic": true,
-      "compileSdkVersion": 34,
-      "targetSdkVersion": 34,
-      "minSdkVersion": 23,
       "permissions": [
         "android.permission.READ_EXTERNAL_STORAGE",
         "android.permission.READ_MEDIA_IMAGES",
@@ -42,6 +37,17 @@
     },
     "plugins": [
       "expo-router",
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "usesCleartextTraffic": true,
+            "minSdkVersion": 23,
+            "compileSdkVersion": 34,
+            "targetSdkVersion": 34
+          }
+        }
+      ],
       [
         "expo-splash-screen",
         {
@@ -69,11 +75,9 @@
       "typedRoutes": true
     },
     "updates": {
-      "enabled": false,
-      "fallbackToCacheTimeout": 0
+      "enabled": false
     },
     "extra": {
-      "router": {},
       "eas": {
         "projectId": "b73c8e50-d91b-441a-9311-6530fc4f248f"
       }
