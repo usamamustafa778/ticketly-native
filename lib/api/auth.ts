@@ -120,15 +120,30 @@ export interface UserProfile {
   role?: string;
   profileImage?: string | null;
   profileImageUrl?: string | null;
+   coverImageUrl?: string | null;
   createdEvents?: any[];
   joinedEvents?: string[] | JoinedEvent[]; // Can be IDs (from login) or full objects (from profile)
   likedEvents?: any[];
   likedEventsVisibility?: 'public' | 'private';
+  followersVisibility?: 'public' | 'private';
+  followingVisibility?: 'public' | 'private';
+  followerCount?: number;
+  followingCount?: number;
+  followers?: PublicUserSummary[];
+  following?: PublicUserSummary[];
   createdAt?: string;
   updatedAt?: string;
 }
 
-/** Public user profile by ID (no auth required) - username, profile image, created/joined/liked events */
+/** Minimal user for followers/following lists */
+export interface PublicUserSummary {
+  _id: string;
+  fullName: string;
+  username?: string;
+  profileImageUrl?: string | null;
+}
+
+/** Public user profile by ID (no auth required) - username, profile image, created/joined/liked events, followers/following */
 export interface PublicUserProfile {
   _id: string;
   id?: string;
@@ -136,8 +151,16 @@ export interface PublicUserProfile {
   fullName: string;
   profileImage?: string | null;
   profileImageUrl?: string | null;
+  coverImageUrl?: string | null;
   companyName?: string | null;
   likedEventsVisibility?: 'public' | 'private';
+  followersVisibility?: 'public' | 'private';
+  followingVisibility?: 'public' | 'private';
+  followerCount?: number;
+  followingCount?: number;
+  followers?: PublicUserSummary[];
+  following?: PublicUserSummary[];
+  isFollowing?: boolean;
   createdEvents?: any[];
   joinedEvents?: { event: any; tickets?: any[] }[];
   likedEvents?: any[];
@@ -230,8 +253,27 @@ export const authAPI = {
   },
 
   // Update User (Self Update)
-  updateUser: async (data: { name?: string; email?: string; password?: string; likedEventsVisibility?: 'public' | 'private' }): Promise<{ success: boolean; message: string; user?: UserProfile }> => {
+  updateUser: async (data: {
+    name?: string;
+    email?: string;
+    password?: string;
+    likedEventsVisibility?: 'public' | 'private';
+    followersVisibility?: 'public' | 'private';
+    followingVisibility?: 'public' | 'private';
+  }): Promise<{ success: boolean; message: string; user?: UserProfile }> => {
     const response = await apiClient.put('/auth/update', data);
+    return response.data;
+  },
+
+  /** Follow a user (auth required) */
+  followUser: async (userId: string): Promise<{ success: boolean; message: string; following: boolean; followerCount?: number }> => {
+    const response = await apiClient.post(`/users/${userId}/follow`);
+    return response.data;
+  },
+
+  /** Unfollow a user (auth required) */
+  unfollowUser: async (userId: string): Promise<{ success: boolean; message: string; following: boolean; followerCount?: number }> => {
+    const response = await apiClient.delete(`/users/${userId}/follow`);
     return response.data;
   },
 
@@ -447,6 +489,134 @@ export const authAPI = {
         throw new Error('Network error. Please check your internet connection and ensure the backend server is running.');
       }
 
+      throw error;
+    }
+  },
+
+  // Upload Cover Image (same behavior as uploadProfileImage but different endpoint)
+  uploadCoverImage: async (imageUri: string): Promise<{ success: boolean; message: string; coverImageUrl: string; user?: UserProfile }> => {
+    const isWeb = Platform.OS === 'web';
+    const FormDataConstructor = (isWeb && typeof window !== 'undefined' && (window as any).FormData)
+      ? (window as any).FormData
+      : FormData;
+    const formData = new FormDataConstructor();
+
+    let filename = 'image.jpg';
+    let type = 'image/jpeg';
+
+    if (imageUri.includes('/')) {
+      const uriParts = imageUri.split('/');
+      const lastPart = uriParts[uriParts.length - 1];
+      if (lastPart && lastPart.includes('.')) {
+        filename = lastPart.split('?')[0];
+      }
+    }
+
+    const ext = filename.split('.').pop()?.toLowerCase();
+    if (ext === 'png') type = 'image/png';
+    else if (ext === 'gif') type = 'image/gif';
+    else if (ext === 'webp') type = 'image/webp';
+    else if (ext === 'jpg' || ext === 'jpeg') type = 'image/jpeg';
+
+    if (imageUri.startsWith('content://')) {
+      filename = `image_${Date.now()}.${ext || 'jpg'}`;
+    }
+
+    if (isWeb) {
+      try {
+        let blob: Blob;
+        const responseToBlob = async (response: Response): Promise<Blob> => {
+          if (typeof response.blob === 'function') return await response.blob();
+          if (typeof response.arrayBuffer === 'function') {
+            const arrayBuffer = await response.arrayBuffer();
+            return new Blob([arrayBuffer], { type: response.headers.get('content-type') || type });
+          }
+          const text = await response.text();
+          return new Blob([text], { type: response.headers.get('content-type') || type });
+        };
+
+        const dataURLToBlob = (dataURL: string): Blob => {
+          const arr = dataURL.split(',');
+          const mimeMatch = arr[0].match(/:(.*?);/);
+          const mime = mimeMatch ? mimeMatch[1] : type;
+          const bstr = atob(arr[1]);
+          let n = bstr.length;
+          const u8arr = new Uint8Array(n);
+          while (n--) u8arr[n] = bstr.charCodeAt(n);
+          return new Blob([u8arr], { type: mime });
+        };
+
+        if (imageUri.startsWith('data:')) {
+          blob = dataURLToBlob(imageUri);
+        } else {
+          const response = await fetch(imageUri);
+          blob = await responseToBlob(response);
+        }
+
+        const file = new File([blob], filename, { type: blob.type || type });
+        formData.append('image', file);
+
+        const response = await apiClient.post('/auth/upload-cover-image', formData, {
+          timeout: 60000,
+          maxContentLength: Infinity,
+          maxBodyLength: Infinity,
+          headers: {},
+        });
+        return response.data;
+      } catch (error: any) {
+        if (error.code === 'ERR_NETWORK' || error.message?.includes('Network')) {
+          throw new Error('Network error. Please check your internet connection and ensure the backend server is running.');
+        }
+        if (error.response?.status === 400) {
+          throw new Error(error.response.data?.message || 'Invalid image file. Please try a different image.');
+        }
+        if (error.response?.status === 413) {
+          throw new Error('Image file is too large. Maximum size is 5MB.');
+        }
+        throw error;
+      }
+    }
+
+    (formData as any).append('image', {
+      uri: imageUri,
+      type,
+      name: filename,
+    } as any);
+
+    try {
+      const accessToken = await getAccessToken();
+      const url = `${API_BASE_URL}/auth/upload-cover-image`;
+
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+          ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
+        },
+        body: formData as any,
+      });
+
+      const responseText = await response.text();
+      let data: any = null;
+      try {
+        data = responseText ? JSON.parse(responseText) : {};
+      } catch {
+        throw new Error('Unexpected response from server while uploading image.');
+      }
+
+      if (!response.ok) {
+        if (response.status === 400) {
+          throw new Error(data?.message || 'Invalid image file. Please try a different image.');
+        }
+        if (response.status === 413) {
+          throw new Error('Image file is too large. Maximum size is 5MB.');
+        }
+        throw new Error(data?.message || `Upload failed with status ${response.status}`);
+      }
+      return data;
+    } catch (error: any) {
+      if (error?.message?.includes('Network request failed')) {
+        throw new Error('Network error. Please check your internet connection and ensure the backend server is running.');
+      }
       throw error;
     }
   },

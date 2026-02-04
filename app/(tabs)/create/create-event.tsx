@@ -13,6 +13,7 @@ import * as ImagePicker from 'expo-image-picker';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   ActivityIndicator,
   Image,
@@ -119,6 +120,7 @@ function deserializeDraft(raw: DraftData): { formData: EventFormData; step: 1 | 
 
 export default function CreateEventScreen() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const user = useAppStore((state) => state.user);
   const setUser = useAppStore((state) => state.setUser);
   const [step, setStep] = useState<1 | 2>(1);
@@ -405,7 +407,7 @@ export default function CreateEventScreen() {
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
       {/* Header: back, progress bar, step label */}
-      <View className="py-2 px-6 shadow-xs">
+      <View className="py-2 px-6 shadow-xs" style={{ paddingTop: insets.top + 8 }}>
         <View className="flex-row items-center justify-between mb-4">
           <BackButton onPress={() => (step === 1 ? router.back() : setStep(1))} className="-ml-2" />
           <View className="flex-1 flex-row items-center justify-center gap-2">

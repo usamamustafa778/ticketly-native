@@ -14,6 +14,7 @@ import {
   Modal as RNModal,
 } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAppStore } from '@/store/useAppStore';
 import { formatApiError } from '@/lib/utils/errorUtils';
 import { authAPI } from '@/lib/api/auth';
@@ -75,6 +76,7 @@ function toImagePath(urlOrPath: string): string | null {
 
 export default function EditEventScreen() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const { id } = useLocalSearchParams<{ id: string }>();
   const user = useAppStore((state) => state.user);
   const setUser = useAppStore((state) => state.setUser);
@@ -369,7 +371,7 @@ export default function EditEventScreen() {
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
       {/* Header: back, progress bar, step label - same as create */}
-      <View className="py-2 px-6 shadow-xs">
+      <View className="py-2 px-6 shadow-xs" style={{ paddingTop: insets.top + 8 }}>
         <View className="flex-row items-center justify-between mb-4">
           <BackButton onPress={() => (step === 1 ? router.back() : setStep(1))} className="-ml-2" />
           <View className="flex-1 flex-row items-center justify-center gap-2">

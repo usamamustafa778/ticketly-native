@@ -7,7 +7,7 @@ import { Label } from '@/components/ui/Label';
 import { LinearGradient } from 'expo-linear-gradient';
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
-const DROPUP_HEIGHT = Math.min(SCREEN_HEIGHT * 0.5, 400);
+const DROPUP_HEIGHT = SCREEN_HEIGHT * 0.7;
 
 interface EventCardProps {
   event: Event;
@@ -207,15 +207,15 @@ export const EventCard: React.FC<EventCardProps> = ({ event, onPress }) => {
           onPress={() => setJoinedUsersDropUpVisible(false)}
         >
           <Pressable
-            className="bg-[#1F1F1F] rounded-t-2xl border-t border-[#374151]"
+            className="bg-white rounded-t-2xl border-t border-gray-200"
             style={{ minHeight: DROPUP_HEIGHT, maxHeight: DROPUP_HEIGHT }}
             onPress={(e) => e.stopPropagation()}
           >
             {/* Handle bar */}
             <View className="items-center pt-2 pb-1">
-              <View className="w-10 h-1 rounded-full bg-[#4B5563]" />
+              <View className="w-10 h-1 rounded-full bg-gray-300" />
             </View>
-            <Text className="text-white text-sm font-semibold px-4 pb-2">
+            <Text className="text-gray-900 text-sm font-semibold px-4 pb-2">
               Joined ({joinedCount > 0 ? joinedCount : joinedUsers.length})
             </Text>
             <ScrollView
@@ -223,12 +223,12 @@ export const EventCard: React.FC<EventCardProps> = ({ event, onPress }) => {
               showsVerticalScrollIndicator={false}
             >
               {joinedUsers.length === 0 && joinedCount > 0 ? (
-                <Text className="text-[#9CA3AF] text-sm py-4">No attendee list available</Text>
+                <Text className="text-gray-500 text-sm py-4">No attendee list available</Text>
               ) : null}
               {joinedUsers.map((user: JoinedUser, index: number) => (
                 <TouchableOpacity
                   key={user.id || user._id || `user-${index}`}
-                  className="flex-row items-center py-3 border-b border-[#374151]/50"
+                  className="flex-row items-center py-3 border-b border-gray-200"
                   onPress={() => {
                     const uid = user.id || user._id;
                     if (uid) {
@@ -246,10 +246,10 @@ export const EventCard: React.FC<EventCardProps> = ({ event, onPress }) => {
                         user.profileImageUrl ||
                         'https://images.unsplash.com/photo-1494797710133-75adf6c1f4a3?w=200',
                     }}
-                    className="w-6 h-6 rounded-full bg-[#374151]"
+                    className="w-6 h-6 rounded-full bg-gray-200"
                     resizeMode="cover"
                   />
-                  <Text className="text-white text-base font-medium ml-3 flex-1" numberOfLines={1}>
+                  <Text className="text-gray-900 text-base font-medium ml-3 flex-1" numberOfLines={1}>
                     {user.name || user.fullName || 'User'}
                   </Text>
                 </TouchableOpacity>

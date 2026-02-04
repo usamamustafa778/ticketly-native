@@ -34,11 +34,11 @@ export default function SettingsScreen() {
   const user = useAppStore((state) => state.user);
   const setUser = useAppStore((state) => state.setUser);
   const logout = useAppStore((state) => state.logout);
-  const [expandedSection, setExpandedSection] = useState<'profile' | 'security' | 'liked' | null>(
+  const [expandedSection, setExpandedSection] = useState<'profile' | 'security' | 'liked' | 'followers' | null>(
     open === 'profile' ? 'profile' : open === 'liked' ? 'liked' : null
   );
 
-  const toggleSection = useCallback((section: 'profile' | 'security' | 'liked' | null) => {
+  const toggleSection = useCallback((section: 'profile' | 'security' | 'liked' | 'followers' | null) => {
     setExpandedSection((prev) => (prev === section ? null : section));
   }, []);
   
@@ -47,7 +47,15 @@ export default function SettingsScreen() {
   const [likedEventsVisibility, setLikedEventsVisibility] = useState<'public' | 'private'>(
     (user as any)?.likedEventsVisibility || 'public'
   );
+  const [followersVisibility, setFollowersVisibility] = useState<'public' | 'private'>(
+    (user as any)?.followersVisibility || 'public'
+  );
+  const [followingVisibility, setFollowingVisibility] = useState<'public' | 'private'>(
+    (user as any)?.followingVisibility || 'public'
+  );
   const [loadingLikedVisibility, setLoadingLikedVisibility] = useState(false);
+  const [loadingFollowersVisibility, setLoadingFollowersVisibility] = useState(false);
+  const [loadingFollowingVisibility, setLoadingFollowingVisibility] = useState(false);
   const [loadingName, setLoadingName] = useState(false);
   
   // Security state
@@ -72,6 +80,10 @@ export default function SettingsScreen() {
   useEffect(() => {
     const vis = (user as any)?.likedEventsVisibility;
     if (vis === 'public' || vis === 'private') setLikedEventsVisibility(vis);
+    const follVis = (user as any)?.followersVisibility;
+    if (follVis === 'public' || follVis === 'private') setFollowersVisibility(follVis);
+    const folVis = (user as any)?.followingVisibility;
+    if (folVis === 'public' || folVis === 'private') setFollowingVisibility(folVis);
   }, [user]);
 
   const onRefresh = useCallback(async () => {
@@ -83,6 +95,8 @@ export default function SettingsScreen() {
         setName(response.user.fullName || '');
         setEmail(response.user.email || '');
         setLikedEventsVisibility((response.user as any)?.likedEventsVisibility || 'public');
+        setFollowersVisibility((response.user as any)?.followersVisibility || 'public');
+        setFollowingVisibility((response.user as any)?.followingVisibility || 'public');
       }
     } catch (_) {
       // Ignore refresh errors
@@ -460,6 +474,66 @@ export default function SettingsScreen() {
                 ]}
                 disabled={loadingLikedVisibility}
               />
+            </View>
+          </CollapsibleSection>
+
+          {/* Followers visibility */}
+          <TouchableOpacity
+            className="flex-row items-center justify-between py-4 border-b border-gray-200"
+            onPress={() => toggleSection('followers')}
+            activeOpacity={0.7}
+          >
+            <View className="flex-row items-center">
+              <MaterialIcons name="people-outline" size={22} color="#111827" style={{ marginRight: 12 }} />
+              <Text className="text-gray-900 text-base font-medium">Followers & Following</Text>
+            </View>
+            <MaterialIcons
+              name={expandedSection === 'followers' ? 'expand-less' : 'expand-more'}
+              size={24}
+              color="#6B7280"
+            />
+          </TouchableOpacity>
+
+          <CollapsibleSection expanded={expandedSection === 'followers'}>
+            <View className="pb-6 pt-2">
+              <DataSelection<'public' | 'private'>
+                label="Who can see your followers list"
+                value={followersVisibility}
+                onSelect={(value) => {
+                  setLoadingFollowersVisibility(true);
+                  authAPI.updateUser({ followersVisibility: value }).then((res) => {
+                    if (res.success && res.user) {
+                      setUser(res.user);
+                      setFollowersVisibility(value);
+                    }
+                  }).finally(() => setLoadingFollowersVisibility(false));
+                }}
+                options={[
+                  { value: 'public', label: 'Public' },
+                  { value: 'private', label: 'Private' },
+                ]}
+                disabled={loadingFollowersVisibility}
+              />
+              <View className="mt-4">
+              <DataSelection<'public' | 'private'>
+                label="Who can see your following list"
+                value={followingVisibility}
+                onSelect={(value) => {
+                  setLoadingFollowingVisibility(true);
+                  authAPI.updateUser({ followingVisibility: value }).then((res) => {
+                    if (res.success && res.user) {
+                      setUser(res.user);
+                      setFollowingVisibility(value);
+                    }
+                  }).finally(() => setLoadingFollowingVisibility(false));
+                }}
+                options={[
+                  { value: 'public', label: 'Public' },
+                  { value: 'private', label: 'Private' },
+                ]}
+                disabled={loadingFollowingVisibility}
+              />
+              </View>
             </View>
           </CollapsibleSection>
         </View>

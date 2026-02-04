@@ -2,7 +2,7 @@ import { EventCard } from '@/components/EventCard';
 import { EventCardSkeleton } from '@/components/EventCardSkeleton';
 import { ButtonPrimary } from '@/components/ui/ButtonPrimary';
 import { TabsRow } from '@/components/ui/Tabs';
-import { authAPI, PROFILE_CACHE_KEY } from '@/lib/api/auth';
+import { authAPI, PROFILE_CACHE_KEY, type PublicUserSummary } from '@/lib/api/auth';
 import { eventsAPI } from '@/lib/api/events';
 import { API_BASE_URL } from '@/lib/config';
 import { useAppStore } from '@/store/useAppStore';
@@ -14,6 +14,7 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { getEventImageUrl, getProfileImageUrl } from '@/lib/utils/imageUtils';
 import {
   ActivityIndicator,
+  Dimensions,
   FlatList,
   Image,
   Modal as RNModal,
@@ -87,6 +88,7 @@ export default function ProfileScreen() {
   const [joinedEventsData, setJoinedEventsData] = useState<any[]>([]); // Store full data with tickets
   const [likedEvents, setLikedEvents] = useState<any[]>([]);
   const [uploadingImage, setUploadingImage] = useState(false);
+  const [uploadingCover, setUploadingCover] = useState(false);
   const [hasCheckedCache, setHasCheckedCache] = useState(false);
   const [showPermissionModal, setShowPermissionModal] = useState(false);
   const [showErrorModal, setShowErrorModal] = useState(false);
@@ -95,6 +97,8 @@ export default function ProfileScreen() {
   const [successModalMessage, setSuccessModalMessage] = useState('');
   const [showLogoutModal, setShowLogoutModal] = useState(false);
   const [showImageViewer, setShowImageViewer] = useState(false);
+  const [showCoverViewer, setShowCoverViewer] = useState(false);
+  const [listModal, setListModal] = useState<'followers' | 'following' | null>(null);
   const hasLoadedRef = useRef(false);
   const currentUserIdRef = useRef<string | null>(null);
 
@@ -135,6 +139,7 @@ export default function ProfileScreen() {
 
   // Use shared getProfileImageUrl (supports both profileImage and profileImageUrl)
   const profileImageUrl = user ? getProfileImageUrl(user) : null;
+  const coverImageUrl = (user as any)?.coverImageUrl ? getProfileImageUrl({ profileImageUrl: (user as any).coverImageUrl }) : null;
 
   // Handle image picker
   const pickImage = async () => {
@@ -213,6 +218,49 @@ export default function ProfileScreen() {
       setShowErrorModal(true);
     } finally {
       setUploadingImage(false);
+    }
+  };
+
+  const pickCoverImage = async () => {
+    try {
+      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (status !== 'granted') {
+        setShowPermissionModal(true);
+        return;
+      }
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        aspect: [16, 9],
+        quality: 0.8,
+      });
+      if (!result.canceled && result.assets[0]) {
+        setUploadingCover(true);
+        try {
+          const response = await authAPI.uploadCoverImage(result.assets[0].uri);
+          if (response.success) {
+            const newCoverUrl = response.coverImageUrl ?? response.user?.coverImageUrl;
+            if (newCoverUrl && user) {
+              setUser({ ...user, coverImageUrl: newCoverUrl } as any);
+            } else if (response.user) {
+              setUser(response.user);
+            }
+            setSuccessModalMessage('Cover photo updated.');
+            setShowSuccessModal(true);
+          } else {
+            setErrorModalMessage(response.message || 'Failed to upload cover photo');
+            setShowErrorModal(true);
+          }
+        } catch (err: any) {
+          setErrorModalMessage(err.response?.data?.message || err.message || 'Failed to upload cover photo.');
+          setShowErrorModal(true);
+        } finally {
+          setUploadingCover(false);
+        }
+      }
+    } catch (error: any) {
+      setErrorModalMessage('Failed to pick image. Please try again.');
+      setShowErrorModal(true);
     }
   };
 
@@ -620,7 +668,7 @@ export default function ProfileScreen() {
         key={activeTab}
         data={profileFlatListData}
         style={{ flex: 1 }}
-        contentContainerStyle={{ paddingTop: insets.top + 10, paddingBottom: bottomPadding, paddingHorizontal: 2 }}
+        contentContainerStyle={{ paddingTop: 0, paddingBottom: bottomPadding, paddingHorizontal: 2 }}
         keyExtractor={(item) => item.id}
         numColumns={2}
         columnWrapperStyle={{ gap: 4, marginBottom: 4 }}
@@ -635,87 +683,154 @@ export default function ProfileScreen() {
         }
         ListHeaderComponent={
           <>
-            {/* Profile Header */}
-            <View className="flex-row justify-end items-center px-3 pb-2">
-              <TouchableOpacity
-                className=" w-10 h-10 rounded-lg items-center justify-center"
-                onPress={() => router.push('/settings')}
+            {/* Banner / Cover (same as user page) */}
+            <View className="w-full overflow-hidden" style={{ height: 160 }}>
+              {/* Cover image background */}
+              {coverImageUrl ? (
+                <Image
+                  source={{ uri: coverImageUrl }}
+                  className="w-full h-full"
+                  resizeMode="cover"
+                />
+              ) : (
+                <View className="w-full h-full" style={{ backgroundColor: '#0f766e' }} />
+              )}
+              
+              {/* Tap area for viewing cover in full screen (only if cover exists) */}
+              {coverImageUrl && (
+                <TouchableOpacity
+                  activeOpacity={1}
+                  onPress={() => setShowCoverViewer(true)}
+                  style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, zIndex: 1 }}
+                />
+              )}
+              
+              {/* Top menu overlay */}
+              <View
+                pointerEvents="box-none"
+                className="absolute inset-0 flex-row justify-between items-start px-4"
+                style={{ paddingTop: insets.top + 8, zIndex: 5 }}
               >
-                <MaterialIcons name="menu" size={24} color="#111827" />
+                <View />
+                <View className="flex-row gap-2">
+                  <TouchableOpacity
+                    className="w-9 h-9 rounded-full bg-black/30 items-center justify-center"
+                    onPress={() => router.push('/settings')}
+                  >
+                    <MaterialIcons name="menu" size={22} color="#fff" />
+                  </TouchableOpacity>
+                </View>
+              </View>
+              
+              {/* Add/change cover photo button - highest zIndex */}
+              <TouchableOpacity
+                onPress={pickCoverImage}
+                disabled={uploadingCover}
+                style={{ position: 'absolute', bottom: 12, right: 16, zIndex: 20 }}
+                className="flex-row items-center gap-2 px-3 py-2 rounded-full bg-black/50"
+                activeOpacity={0.8}
+              >
+                {uploadingCover ? (
+                  <ActivityIndicator size="small" color="#fff" />
+                ) : (
+                  <MaterialIcons name="camera-alt" size={18} color="#fff" />
+                )}
+                <Text className="text-white text-sm font-medium">
+                  {coverImageUrl ? 'Change cover' : 'Add cover'}
+                </Text>
               </TouchableOpacity>
             </View>
 
-            {/* Profile Section - Centered */}
-            <View className="items-center py-6 pb-4">
-              <View className="relative">
-                <TouchableOpacity
-                  onPress={() => setShowImageViewer(true)}
-                  activeOpacity={0.8}
-                  disabled={uploadingImage}
-                  className="w-[100px] h-[100px] rounded-full overflow-hidden"
-                >
-                  <View className="w-full h-full rounded-full bg-primary items-center justify-center overflow-hidden">
-                    {profileImageUrl ? (
-                      <Image
-                        source={{ uri: profileImageUrl }}
-                        className="w-full h-full"
-                        resizeMode="cover"
-                      />
-                    ) : (
-                      <Text className="text-white text-4xl font-bold">
-                        {user.fullName.charAt(0).toUpperCase()}
-                      </Text>
+            {/* Bottom page container: white card with rounded top (like user page) */}
+            <View className="bg-white rounded-t-3xl -mt-5 border-t border-gray-200">
+              {/* Profile pic overlapping banner + name row */}
+              <View className="px-4" style={{ marginTop: -32 }}>
+                <View className="flex-row items-end">
+                  <View className="relative">
+                    <TouchableOpacity
+                      onPress={() => setShowImageViewer(true)}
+                      activeOpacity={0.8}
+                      disabled={uploadingImage}
+                      className="rounded-full overflow-hidden border-4 border-white bg-primary"
+                      style={{ width: 96, height: 96 }}
+                    >
+                      {profileImageUrl ? (
+                        <Image source={{ uri: profileImageUrl }} className="w-full h-full" resizeMode="cover" />
+                      ) : (
+                        <View className="w-full h-full items-center justify-center">
+                          <Text className="text-white text-3xl font-bold">
+                            {user.fullName.charAt(0).toUpperCase()}
+                          </Text>
+                        </View>
+                      )}
+                      {uploadingImage && (
+                        <View className="absolute inset-0 bg-black/50 items-center justify-center">
+                          <ActivityIndicator size="small" color="#fff" />
+                        </View>
+                      )}
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      onPress={pickImage}
+                      disabled={uploadingImage}
+                      activeOpacity={0.8}
+                      className="absolute bottom-0 right-0 bg-primary w-8 h-8 rounded-full items-center justify-center border-2 border-white"
+                    >
+                      <MaterialIcons name="camera-alt" size={16} color="#FFFFFF" />
+                    </TouchableOpacity>
+                  </View>
+                  <View className="flex-1 ml-4 pb-1">
+                    <Text className="text-gray-900 text-xl font-bold" numberOfLines={1}>
+                      {user.fullName}
+                    </Text>
+                    {user.username && (
+                      <Text className="text-gray-500 text-sm mt-0.5">@{user.username}</Text>
+                    )}
+                    {user.companyName && (
+                      <Text className="text-primary text-sm font-semibold mt-0.5">{user.companyName}</Text>
                     )}
                   </View>
-                  {uploadingImage && (
-                    <View className="absolute inset-0 bg-black/50 rounded-full items-center justify-center">
-                      <ActivityIndicator size="small" color="#DC2626" />
-                    </View>
-                  )}
-                </TouchableOpacity>
-                <TouchableOpacity
-                  onPress={pickImage}
-                  disabled={uploadingImage}
-                  activeOpacity={0.8}
-                  className="absolute bottom-0 right-0 bg-primary w-8 h-8 rounded-full items-center justify-center border-2 border-white"
-                >
-                  <MaterialIcons name="camera-alt" size={16} color="#FFFFFF" />
-                </TouchableOpacity>
-              </View>
-              <TouchableOpacity
-                className="flex-row items-center gap-2 mb-1"
-                onPress={() => router.push('/settings?open=profile')}
-                activeOpacity={0.7}
-              >
-                <Text className="text-gray-900 text-2xl font-bold">{user.fullName}</Text>
-                <MaterialIcons name="edit" size={20} color="#DC2626" />
-              </TouchableOpacity>
-              {user.companyName && (
-                <Text className="text-primary text-base font-semibold mt-1">{user.companyName}</Text>
-              )}
-              {user.username && (
-                <Text className="text-gray-500 text-sm text-center">@{user.username}</Text>
-              )}
-            </View>
-            {/* Stats */}
-            {/* <View className="flex-row justify-around px-16 py-2">
-              <View className="items-center">
-                <Text className="text-gray-900 text-base font-bold mb-0.5">{createdEvents.length}</Text>
-                <Text className="text-[#9CA3AF] text-[10px]">Created</Text>
-              </View>
-              <View className="items-center">
-                <Text className="text-gray-900 text-base font-bold mb-0.5">{joinedEventsData.length}</Text>
-                <Text className="text-[#9CA3AF] text-[10px]">Joined</Text>
-              </View>
-              <View className="items-center">
-                <Text className="text-gray-900 text-base font-bold mb-0.5">{likedEvents.length}</Text>
-                <Text className="text-[#9CA3AF] text-[10px]">Liked</Text>
-              </View>
-            </View> */}
+                </View>
 
-            {/* Tabs */}
-            <View className="mx-10 ">
-              <View className="py-2 translate-y-[-2px] bg-white">
+                {/* Stats: X followers • Y following • Z events (same as user page) */}
+                <View className="flex-row flex-wrap items-center mt-3 gap-1">
+                  <TouchableOpacity
+                    onPress={() => ((user as any).followersVisibility === 'public' ? setListModal('followers') : null)}
+                    activeOpacity={(user as any).followersVisibility === 'public' ? 0.7 : 1}
+                  >
+                    <Text className="text-gray-700 text-sm font-semibold">
+                      {(user as any).followerCount ?? 0} followers
+                    </Text>
+                  </TouchableOpacity>
+                  <Text className="text-gray-400 text-sm"> • </Text>
+                  <TouchableOpacity
+                    onPress={() => ((user as any).followingVisibility === 'public' ? setListModal('following') : null)}
+                    activeOpacity={(user as any).followingVisibility === 'public' ? 0.7 : 1}
+                  >
+                    <Text className="text-gray-700 text-sm font-semibold">
+                      {(user as any).followingCount ?? 0} following
+                    </Text>
+                  </TouchableOpacity>
+                  <Text className="text-gray-400 text-sm"> • </Text>
+                  <Text className="text-gray-700 text-sm font-semibold">
+                    {createdEvents.length} events
+                  </Text>
+                </View>
+
+                {/* Edit profile button (same style as user page) */}
+                <View className="flex-row gap-3 mt-4">
+                  <TouchableOpacity
+                    className="flex-1 flex-row items-center justify-center gap-2 py-2.5 rounded-full bg-gray-200"
+                    activeOpacity={0.8}
+                    onPress={() => router.push('/settings')}
+                  >
+                    <MaterialIcons name="edit" size={20} color="#374151" />
+                    <Text className="font-semibold text-sm text-gray-700">Edit profile</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+
+              {/* Tabs */}
+              <View className="mx-4 mt-5 mb-2">
                 <TabsRow
                   items={[
                     { key: 'created', label: 'Created Events' },
@@ -834,6 +949,104 @@ export default function ProfileScreen() {
             <MaterialIcons name="close" size={24} color="#FFFFFF" />
           </TouchableOpacity>
         </Pressable>
+      </RNModal>
+
+      {/* Cover Image Viewer */}
+      <RNModal
+        visible={showCoverViewer}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowCoverViewer(false)}
+      >
+        <Pressable
+          className="flex-1 bg-black justify-center items-center"
+          onPress={() => setShowCoverViewer(false)}
+        >
+          {coverImageUrl ? (
+            <Image
+              source={{ uri: coverImageUrl }}
+              className="w-full h-full"
+              resizeMode="contain"
+            />
+          ) : null}
+          <TouchableOpacity
+            className="absolute right-4 top-4 bg-white/20 w-10 h-10 rounded-full items-center justify-center"
+            style={{ top: insets.top + 8 }}
+            onPress={() => setShowCoverViewer(false)}
+          >
+            <MaterialIcons name="close" size={24} color="#FFFFFF" />
+          </TouchableOpacity>
+        </Pressable>
+      </RNModal>
+
+      {/* Followers / Following list modal */}
+      <RNModal
+        visible={listModal !== null}
+        animationType="slide"
+        transparent
+        onRequestClose={() => setListModal(null)}
+      >
+        <View className="flex-1 bg-black/50 justify-end">
+          <Pressable className="flex-1" onPress={() => setListModal(null)} />
+          <View
+            className="bg-white rounded-t-2xl"
+            style={{
+              paddingBottom: insets.bottom + 16,
+              minHeight: Dimensions.get('window').height * 0.7,
+              maxHeight: Dimensions.get('window').height * 0.7,
+            }}
+          >
+            <View className="flex-row items-center justify-between py-3 px-4 border-b border-gray-200">
+              <Text className="text-lg font-semibold text-gray-900">
+                {listModal === 'followers' ? 'Followers' : 'Following'}
+              </Text>
+              <TouchableOpacity onPress={() => setListModal(null)} className="p-2">
+                <MaterialIcons name="close" size={24} color="#374151" />
+              </TouchableOpacity>
+            </View>
+            <FlatList
+              data={listModal === 'followers' ? ((user as any)?.followers ?? []) : ((user as any)?.following ?? [])}
+              keyExtractor={(item: PublicUserSummary) => item._id}
+              renderItem={({ item }: { item: PublicUserSummary }) => (
+                <TouchableOpacity
+                  className="flex-row items-center py-3 px-4 border-b border-gray-100"
+                  onPress={() => {
+                    setListModal(null);
+                    if (item._id !== user?._id) router.push(`/user/${item._id}`);
+                  }}
+                  activeOpacity={0.7}
+                >
+                  <View className="w-10 h-10 rounded-full bg-primary items-center justify-center overflow-hidden mr-3">
+                    {item.profileImageUrl ? (
+                      <Image
+                        source={{ uri: getProfileImageUrl({ profileImageUrl: item.profileImageUrl }) || '' }}
+                        className="w-full h-full"
+                        resizeMode="cover"
+                      />
+                    ) : (
+                      <Text className="text-white font-bold text-lg">
+                        {(item.fullName || '?').charAt(0).toUpperCase()}
+                      </Text>
+                    )}
+                  </View>
+                  <View className="flex-1">
+                    <Text className="text-gray-900 font-medium">{item.fullName || 'User'}</Text>
+                    {item.username && <Text className="text-gray-500 text-sm">@{item.username}</Text>}
+                  </View>
+                  <MaterialIcons name="chevron-right" size={24} color="#9CA3AF" />
+                </TouchableOpacity>
+              )}
+              ListEmptyComponent={
+                <View className="py-8 items-center">
+                  <MaterialIcons name="people-outline" size={48} color="#9CA3AF" />
+                  <Text className="text-gray-500 mt-2">
+                    No {listModal === 'followers' ? 'followers' : 'following'} yet
+                  </Text>
+                </View>
+              }
+            />
+          </View>
+        </View>
       </RNModal>
     </View>
   );
