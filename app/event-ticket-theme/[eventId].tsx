@@ -20,6 +20,7 @@ import { BackButton } from '@/components/BackButton';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { eventsAPI, type Event } from '@/lib/api/events';
 import { TicketPreview } from '@/components/TicketPreview';
+
 import {
   mergeTicketTheme,
   DEFAULT_TICKET_THEME,
@@ -30,6 +31,7 @@ import {
   type PatternWeight,
 } from '@/lib/types/ticketTheme';
 import { isValidHex, normalizeHex } from '@/lib/utils/colorUtils';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 const THEME_KEYS: (keyof TicketTheme)[] = [
   'gradientStart',
@@ -159,22 +161,23 @@ export default function EventTicketThemeScreen() {
           ))}
         </View>
       </View>
-    );
+    ); 
   }
 
   const mergedTheme = mergeTicketTheme(theme);
+  const insets = useSafeAreaInsets();
 
   return (
     <KeyboardAvoidingView
       className="flex-1 bg-white"
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
-      <View className="pt-[6px] px-3 pb-2 border-b border-gray-200">
-        <View className="flex-row items-center justify-between">
-          <BackButton onPress={() => router.back()} />
-          <Text className="text-gray-900 text-sm font-semibold">Event Ticket Theme</Text>
-          <View className="w-8" />
-        </View>
+         <View
+        className="px-4 py-2 shadow-xs flex-row items-center gap-2 bg-white z-10"
+        style={{ paddingTop: insets.top + 8 }}
+      >
+        <BackButton onPress={() => router.back()} />
+        <Text className="text-lg font-bold text-gray-900">Event Ticket Theme</Text>
       </View>
 
       <ScrollView
