@@ -21,7 +21,7 @@ interface TabsProps<T extends string = string> {
 const activeBg = ' border-b-2 border-primary';
 const inactiveBg = '';
 const activeText = 'text-primary';
-const inactiveText = 'text-gray-500';
+const inactiveText = 'text-gray-800';
 
 /**
  * Horizontal tab bar – active = light red tint + primary text, inactive = gray.

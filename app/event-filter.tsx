@@ -247,7 +247,7 @@ export default function EventFilterScreen() {
   return (
     <View className="flex-1 bg-white">
       <View
-        className="border-b mt-3 border-gray-200 bg-white"
+        className="shadow-xs mt-3 bg-white"
         style={{ paddingTop: safeTop, }}
       >
         <View className="flex-row items-center ">

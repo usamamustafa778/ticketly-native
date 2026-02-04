@@ -193,7 +193,7 @@ export default function ExploreScreen() {
         }}
       >
         <View
-          className="bg-white border-b border-gray-200 overflow-hidden"
+          className="bg-white shadow-xs overflow-hidden"
           style={{ paddingTop: safeTop }}
         >
           {/* Search at top of page */}

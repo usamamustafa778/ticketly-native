@@ -396,17 +396,20 @@ export default function CreatedEventDetailsScreen() {
       <View
         style={{
           position: 'absolute',
-          top: insets.top + 8,
-          left: 16,
-          right: 16,
+          top: insets.top + 0,
+          left: 0,
+          right: 0,
           flexDirection: 'row',
           justifyContent: 'space-between',
           zIndex: 10,
+          paddingHorizontal: 16,
+          paddingVertical: 8,
+
         }}
       >
         <BackButton variant="dark" onPress={() => router.back()} />
         <TouchableOpacity
-          className="bg-primary w-10 h-10 rounded-full items-center justify-center"
+          className="bg-primary w-7 h-7 rounded-full items-center justify-center"
           onPress={() => {
             const eventId = getEventId();
             if (eventId) {
@@ -414,7 +417,7 @@ export default function CreatedEventDetailsScreen() {
             }
           }}
         >
-          <MaterialIcons name="edit" size={20} color="#FFFFFF" />
+          <MaterialIcons name="edit" size={16} color="#FFFFFF" />
         </TouchableOpacity>
       </View>
       <ScrollView
@@ -963,11 +966,11 @@ export default function CreatedEventDetailsScreen() {
             resizeMode="contain"
           />
           <TouchableOpacity
-            className="absolute right-4 bg-white/20 w-10 h-10 rounded-full items-center justify-center"
+            className="absolute right-4 bg-white/20 w-7 h-7 rounded-full items-center justify-center"
             style={{ top: insets.top + 8 }}
             onPress={() => setShowImageViewer(false)}
           >
-            <MaterialIcons name="close" size={24} color="#FFFFFF" />
+            <MaterialIcons name="close" size={16} color="#FFFFFF" />
           </TouchableOpacity>
         </Pressable>
       </RNModal>

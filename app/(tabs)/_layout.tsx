@@ -34,7 +34,7 @@ export default function TabLayout() {
     <Tabs
       screenOptions={{
         tabBarActiveTintColor: '#DC2626',
-        tabBarInactiveTintColor: '#6B7280',
+        tabBarInactiveTintColor: '#212121',
         tabBarShowLabel: false,
         headerShown: false,
         tabBarButton: HapticTab,
@@ -56,7 +56,7 @@ export default function TabLayout() {
         options={{
           title: 'Discover',
           tabBarIcon: ({ color }) => (
-            <MaterialIcons name="explore" size={20} color={color} />
+            <MaterialIcons name="explore" size={24} color={color} />
           ),
         }}
       />
@@ -65,7 +65,7 @@ export default function TabLayout() {
         options={{
           title: 'Search',
           tabBarIcon: ({ color }) => (
-            <MaterialIcons name="search" size={20} color={color} />
+            <MaterialIcons name="search" size={24} color={color} />
           ),
         }}
       />
@@ -74,17 +74,26 @@ export default function TabLayout() {
         options={{
           title: 'Create',
           tabBarIcon: ({ color }) => (
-            <MaterialIcons name="add-circle-outline" size={20} color={color} />
+            <MaterialIcons name="add-circle-outline" size={24} color={color} />
           ),
           tabBarButton: CreateTabButton,
         }}
       />
       <Tabs.Screen
+        name="liked"
+        options={{
+          title: 'Liked',
+          tabBarIcon: ({ color }) => (
+            <MaterialIcons name="favorite" size={24} color={color} />
+          ),
+        }}
+      />
+       <Tabs.Screen
         name="profile"
         options={{
           title: 'Profile',
           tabBarIcon: ({ color }) => (
-            <MaterialIcons name="person-outline" size={20} color={color} />
+            <MaterialIcons name="person-outline" size={24} color={color} />
           ),
         }}
       />

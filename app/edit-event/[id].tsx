@@ -344,7 +344,7 @@ export default function EditEventScreen() {
     return x;
   })();
 
-  const inputRow = 'bg-gray-50 rounded-md py-2 px-3 flex-row items-center gap-2 border border-gray-200';
+  const inputRow = 'bg-gray-50 rounded-xl py-2 px-3 flex-row items-center gap-2 border border-gray-200';
   const iconWrap = 'w-8 h-8 rounded-full bg-gray-200 items-center justify-center';
   const labelClass = 'text-gray-900 text-sm font-medium mb-1.5';
 
@@ -369,7 +369,7 @@ export default function EditEventScreen() {
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
       {/* Header: back, progress bar, step label - same as create */}
-      <View className="pt-[52px] px-4 pb-4 border-b border-gray-200">
+      <View className="py-2 px-6 shadow-xs">
         <View className="flex-row items-center justify-between mb-4">
           <BackButton onPress={() => (step === 1 ? router.back() : setStep(1))} className="-ml-2" />
           <View className="flex-1 flex-row items-center justify-center gap-2">
@@ -382,8 +382,8 @@ export default function EditEventScreen() {
           </View>
           <Text className="text-gray-900 text-sm font-medium ml-2 w-10 text-right">{step} of 2</Text>
         </View>
-        <Text className="text-gray-900 text-2xl font-bold">
-          {step === 1 ? 'Event Details' : 'Payment and Ticket Details'}
+        <Text className="text-gray-900 text-lg font-bold">
+          {step === 1 ? 'Edit Event Details' : 'Edit Payment and Ticket Details'}
         </Text>
       </View>
 
@@ -566,7 +566,7 @@ export default function EditEventScreen() {
             />
 
             <ButtonPrimary
-              fullWidth
+              size="lg"
               onPress={handleNext}
               disabled={!step1Valid}
             >
@@ -624,7 +624,7 @@ export default function EditEventScreen() {
             )}
 
             <ButtonPrimary
-              fullWidth
+              size="lg"
               onPress={handleSubmit}
               disabled={saving || !step2Valid}
               loading={saving}

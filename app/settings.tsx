@@ -311,7 +311,7 @@ export default function SettingsScreen() {
                 loading={loadingName}
                 disabled={loadingName}
                 onPress={handleUpdateName}
-                size="md"
+                size="lg"
               >
                 Update Name
               </ButtonPrimary>
@@ -355,7 +355,7 @@ export default function SettingsScreen() {
                 disabled={loadingEmail}
                 onPress={handleUpdateEmail}
                 className="mb-8"
-                size="md"
+                size="lg"
               >
                 Update Email
               </ButtonPrimary>
@@ -413,7 +413,7 @@ export default function SettingsScreen() {
                 loading={loadingPassword}
                 disabled={loadingPassword}
                 onPress={handleUpdatePassword}
-                size="md"
+                size="lg"
               >
                 Update Password
               </ButtonPrimary>

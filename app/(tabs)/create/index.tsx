@@ -33,10 +33,10 @@ export default function CreateTabScreen() {
                     Start creating amazing events and reach your audience
                 </Text>
                 <TouchableOpacity
-                    className="bg-primary py-4 px-8 rounded-xl"
+                    className="bg-primary py-2.5 px-8 rounded-xl"
                     onPress={() => router.push('/create/create-event')}
                 >
-                    <Text className="text-white text-base font-semibold">Get Started</Text>
+                    <Text className="text-white text-sm font-semibold">Get Started</Text>
                 </TouchableOpacity>
             </View>
         </ScrollView>
