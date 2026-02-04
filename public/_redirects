@@ -1,0 +1,2 @@
+# SPA fallback: serve index.html for all routes (used by Netlify etc. after expo export -p web)
+/*    /index.html   200

@@ -9,8 +9,10 @@ interface AppState {
   user: UserProfile | null;
   events: Event[];
   isAuthenticated: boolean;
+  notificationUnreadCount: number;
   setUser: (user: UserProfile | null) => void;
   setEvents: (events: Event[]) => void;
+  setNotificationUnreadCount: (count: number) => void;
   toggleEventLike: (eventId: string, userId: string) => void;
   registerForEvent: (eventId: string, userId: string) => void;
   unregisterFromEvent: (eventId: string, userId: string) => void;
@@ -23,10 +25,13 @@ export const useAppStore = create<AppState>((set) => ({
   user: null,
   events: [],
   isAuthenticated: false,
-  
+  notificationUnreadCount: 0,
+
   setUser: (user) => set({ user }),
-  
+
   setEvents: (events) => set({ events }),
+
+  setNotificationUnreadCount: (count) => set({ notificationUnreadCount: count }),
   
   toggleEventLike: (eventId, userId) => set((state) => ({
     events: state.events.map((event) =>
@@ -75,10 +80,10 @@ export const useAppStore = create<AppState>((set) => ({
     try {
       await authAPI.clearProfileCache();
       await clearTokens();
-      set({ user: null, isAuthenticated: false, events: [] });
+      set({ user: null, isAuthenticated: false, events: [], notificationUnreadCount: 0 });
     } catch (error) {
       console.error('Logout error:', error);
-      set({ user: null, isAuthenticated: false, events: [] });
+      set({ user: null, isAuthenticated: false, events: [], notificationUnreadCount: 0 });
     }
   },
 }));

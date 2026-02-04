@@ -69,11 +69,18 @@ function convertEvent(apiEvent: any) {
 
 export default function UserProfileScreen() {
   const router = useRouter();
-  const { id } = useLocalSearchParams<{ id: string }>();
+  const { id, returnTo } = useLocalSearchParams<{ id: string; returnTo?: string }>();
   const insets = useSafeAreaInsets();
+  const handleBack = () => {
+    if (returnTo === 'notifications') {
+      router.replace('/(tabs)/notifications');
+    } else {
+      router.back();
+    }
+  };
   const currentUser = useAppStore((s) => s.user);
   const currentUserId = currentUser?._id || (currentUser as any)?.id;
-  const isOwnProfile = !!id && !!currentUserId && id === currentUserId;
+  const isOwnProfile = !!id && !!currentUserId && String(id) === String(currentUserId);
 
   const [profile, setProfile] = useState<PublicUserProfile | null>(null);
   const [loading, setLoading] = useState(true);
@@ -84,6 +91,8 @@ export default function UserProfileScreen() {
   const [showCoverViewer, setShowCoverViewer] = useState(false);
   const [followLoading, setFollowLoading] = useState(false);
   const [listModal, setListModal] = useState<'followers' | 'following' | null>(null);
+
+  const isOtherUserProfile = !!profile && String(profile._id) !== String(currentUserId ?? '');
 
   // No bottom tab bar on user page (outside tabs folder), so no extra bottom padding needed
   const bottomPadding = 20;
@@ -170,27 +179,29 @@ export default function UserProfileScreen() {
   const onRefresh = () => fetchProfile(true);
 
   const handleFollowToggle = useCallback(async () => {
-    if (!id || followLoading || isOwnProfile) return;
+    if (!id || followLoading || isOwnProfile || !currentUserId) return;
     setFollowLoading(true);
     try {
       const isCurrentlyFollowing = profile?.isFollowing ?? false;
       if (isCurrentlyFollowing) {
         await authAPI.unfollowUser(id);
         const newCount = Math.max(0, (profile?.followerCount ?? 0) - 1);
-        setProfile((p) => (p ? { ...p, isFollowing: false, followerCount: newCount } : p));
-        await setCached(CACHE_KEYS.USER_PROFILE_BY_ID(id), profile ? { ...profile, isFollowing: false, followerCount: newCount } : null);
+        const updatedFollowers = (profile?.followers ?? []).filter((f) => f._id !== currentUserId);
+        const updated = profile
+          ? { ...profile, isFollowing: false, followerCount: newCount, followers: updatedFollowers }
+          : null;
+        setProfile((p) => (p ? { ...p, isFollowing: false, followerCount: newCount, followers: updatedFollowers } : p));
+        if (updated) await setCached(CACHE_KEYS.USER_PROFILE_BY_ID(id), updated);
       } else {
         await authAPI.followUser(id);
-        const newCount = (profile?.followerCount ?? 0) + 1;
-        setProfile((p) => (p ? { ...p, isFollowing: true, followerCount: newCount } : p));
-        await setCached(CACHE_KEYS.USER_PROFILE_BY_ID(id), profile ? { ...profile, isFollowing: true, followerCount: newCount } : null);
+        await fetchProfile(true);
       }
     } catch (_) {
       fetchProfile(true);
     } finally {
       setFollowLoading(false);
     }
-  }, [id, followLoading, isOwnProfile, profile]);
+  }, [id, followLoading, isOwnProfile, profile, currentUserId, fetchProfile]);
 
   const createdEvents = (profile?.createdEvents || []).map(convertEvent);
   const joinedEvents = (profile?.joinedEvents || [])
@@ -217,7 +228,7 @@ export default function UserProfileScreen() {
       <View className="flex-1 bg-white">
         <View className="flex-1 items-center justify-center p-10">
           <Text className="text-[#EF4444] text-lg mb-6">{error || 'User not found'}</Text>
-          <ButtonPrimary onPress={() => router.back()}>
+          <ButtonPrimary onPress={handleBack}>
             Go Back
           </ButtonPrimary>
         </View>
@@ -288,7 +299,7 @@ export default function UserProfileScreen() {
                 className="absolute inset-0 flex-row justify-between items-start px-4"
                 style={{ paddingTop: insets.top + 8, zIndex: 5 }}
               >
-                <BackButton variant="dark" onPress={() => router.back()} />
+                <BackButton variant="dark" onPress={handleBack} />
                 <View className="flex-row gap-2">
                   <TouchableOpacity className="w-9 h-9 rounded-full bg-black/30 items-center justify-center" onPress={() => {}}>
                     <MaterialIcons name="more-horiz" size={22} color="#fff" />
@@ -360,12 +371,12 @@ export default function UserProfileScreen() {
                 <Text className="text-gray-600 text-sm mt-1">{profile.companyName}</Text>
               )}
 
-              {/* Action button: Follow */}
+              {/* Action button: Follow - show whenever viewing another user's profile */}
               <View className="flex-row gap-3 mt-4">
-                {!isOwnProfile && currentUserId && (
+                {isOtherUserProfile && (
                   <TouchableOpacity
                     onPress={handleFollowToggle}
-                    disabled={followLoading}
+                    disabled={followLoading || !currentUserId}
                     activeOpacity={0.8}
                     className="flex-1 flex-row items-center justify-center gap-2 py-2.5 border border-black rounded-full bg-white"
                   >

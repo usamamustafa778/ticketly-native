@@ -38,7 +38,14 @@ import { getEventImageUrl } from '@/lib/utils/imageUtils';
 export default function EventDetailsScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { id } = useLocalSearchParams<{ id: string }>();
+  const { id, returnTo } = useLocalSearchParams<{ id: string; returnTo?: string }>();
+  const handleBack = () => {
+    if (returnTo === 'notifications') {
+      router.replace('/(tabs)/notifications');
+    } else {
+      router.back();
+    }
+  };
   const user = useAppStore((state) => state.user);
   const setUser = useAppStore((state) => state.setUser);
   const registerForEvent = useAppStore((state) => state.registerForEvent);
@@ -284,7 +291,7 @@ export default function EventDetailsScreen() {
           <Text className="text-[#EF4444] text-sm mb-4">{error || 'Event not found'}</Text>
           <TouchableOpacity
             className="bg-primary py-2 px-4 rounded-lg"
-            onPress={() => router.back()}
+            onPress={handleBack}
           >
             <Text className="text-white text-xs font-semibold">Go Back</Text>
           </TouchableOpacity>
@@ -431,7 +438,7 @@ export default function EventDetailsScreen() {
           zIndex: 10,
         }}
       >
-        <BackButton variant="dark" onPress={() => router.back()} />
+        <BackButton variant="dark" onPress={handleBack} />
       </View>
       <ScrollView
         ref={scrollViewRef}

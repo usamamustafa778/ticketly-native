@@ -92,6 +92,7 @@ export default function NotificationsScreen() {
   const insets = useSafeAreaInsets();
   const bottomPadding = useBottomPadding();
   const user = useAppStore((state) => state.user);
+  const setNotificationUnreadCount = useAppStore((state) => state.setNotificationUnreadCount);
 
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
@@ -103,6 +104,7 @@ export default function NotificationsScreen() {
     if (!user?._id) {
       setNotifications([]);
       setUnreadCount(0);
+      setNotificationUnreadCount(0);
       setLoading(false);
       return;
     }
@@ -118,6 +120,7 @@ export default function NotificationsScreen() {
       }
       if (countRes.success && typeof countRes.count === 'number') {
         setUnreadCount(countRes.count);
+        setNotificationUnreadCount(countRes.count);
       }
     } catch (e) {
       // keep previous data on error
@@ -142,13 +145,17 @@ export default function NotificationsScreen() {
             n._id === item._id ? { ...n, read: true } : n
           )
         );
-        setUnreadCount((c) => Math.max(0, c - 1));
+        setUnreadCount((c) => {
+          const newCount = Math.max(0, c - 1);
+          setNotificationUnreadCount(newCount);
+          return newCount;
+        });
       } catch (_) {}
     }
     if (item.eventId?._id) {
-      router.push(`/event-details/${item.eventId._id}`);
+      router.push(`/event-details/${item.eventId._id}?returnTo=notifications`);
     } else if (item.actorUserId?._id) {
-      router.push(`/user/${item.actorUserId._id}`);
+      router.push(`/user/${item.actorUserId._id}?returnTo=notifications`);
     }
   };
 
@@ -161,6 +168,7 @@ export default function NotificationsScreen() {
         prev.map((n) => ({ ...n, read: true, readAt: n.readAt || new Date().toISOString() }))
       );
       setUnreadCount(0);
+      setNotificationUnreadCount(0);
     } catch (_) {}
     finally {
       setMarkingAll(false);

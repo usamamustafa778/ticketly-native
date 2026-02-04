@@ -5,9 +5,11 @@ import { CREATE_EVENT_DRAFT_KEY } from '@/app/(tabs)/create/create-event';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Tabs, useRouter } from 'expo-router';
-import React from 'react';
+import React, { useEffect } from 'react';
 import { Platform } from 'react-native';
 import type { BottomTabBarButtonProps } from '@react-navigation/bottom-tabs';
+import { useAppStore } from '@/store/useAppStore';
+import { notificationsAPI } from '@/lib/api/notifications';
 
 function CreateTabButton(props: BottomTabBarButtonProps) {
   const router = useRouter();
@@ -29,6 +31,17 @@ function CreateTabButton(props: BottomTabBarButtonProps) {
 
 export default function TabLayout() {
   const colorScheme = useColorScheme();
+  const notificationUnreadCount = useAppStore((s) => s.notificationUnreadCount);
+  const user = useAppStore((s) => s.user);
+
+  // Fetch unread count when tabs mount (user logged in) so badge shows without opening notifications
+  useEffect(() => {
+    if (!user?._id) return;
+    notificationsAPI
+      .unreadCount()
+      .then((res) => res.success && typeof res.count === 'number' && useAppStore.getState().setNotificationUnreadCount(res.count))
+      .catch(() => {});
+  }, [user?._id]);
 
   return (
     <Tabs
@@ -83,6 +96,7 @@ export default function TabLayout() {
         name="notifications"
         options={{
           title: 'Notifications',
+          tabBarBadge: notificationUnreadCount > 0 ? notificationUnreadCount : undefined,
           tabBarIcon: ({ color }) => (
             <MaterialIcons name="notifications" size={24} color={color} />
           ),
