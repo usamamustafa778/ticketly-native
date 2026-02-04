@@ -35,6 +35,7 @@ interface EventFormData {
   eventDate: Date | null;
   eventTime: string;
   address: string;
+  category: string;
   genderSelection: string;
   description: string;
   imageUri: string | null;
@@ -47,7 +48,29 @@ interface EventFormData {
 }
 
 const GENDER_OPTIONS = ['All', 'Male', 'Female'] as const;
+const CATEGORY_OPTIONS = [
+  'Other',
+  'Music',
+  'Sports',
+  'Technology',
+  'Conference',
+  'Workshop',
+  'Social',
+  'Arts',
+  'Education',
+  'Health',
+  'Business',
+  'Food & Drink',
+  'Community',
+] as const;
 const CURRENCY_OPTIONS = [{ code: 'PKR', label: 'Pakistani Rupee (PKR)', flag: '🇵🇰' }] as const;
+
+function categoryForDisplay(apiCategory: string | undefined): string {
+  if (!apiCategory?.trim()) return 'Other';
+  const lower = apiCategory.trim().toLowerCase();
+  const found = CATEGORY_OPTIONS.find((o) => o.toLowerCase() === lower);
+  return found || 'Other';
+}
 
 function genderToApi(v: string): 'all' | 'male' | 'female' {
   const lower = v.toLowerCase();
@@ -97,6 +120,7 @@ export default function EditEventScreen() {
     eventDate: null,
     eventTime: '18:00',
     address: '',
+    category: 'Other',
     genderSelection: 'All',
     description: '',
     imageUri: null,
@@ -158,6 +182,7 @@ export default function EditEventScreen() {
             eventDate,
             eventTime: e.time || '18:00',
             address: e.location || '',
+            category: categoryForDisplay(e.category),
             genderSelection: genderCap,
             description: e.description || '',
             imageUri: displayImageUrl || null,
@@ -230,7 +255,8 @@ export default function EditEventScreen() {
     Boolean(formData.eventName.trim()) &&
     Boolean(formData.eventDate) &&
     Boolean(formData.eventTime?.trim()) &&
-    Boolean(formData.genderSelection?.trim());
+    Boolean(formData.genderSelection?.trim()) &&
+    formData.description.trim().length >= 10;
 
   const validateStep1 = (): boolean => {
     const nextErrors: Partial<Record<keyof EventFormData, string>> = {};
@@ -238,6 +264,7 @@ export default function EditEventScreen() {
     if (!formData.eventDate) nextErrors.eventDate = 'Start date is required';
     if (!formData.eventTime?.trim()) nextErrors.eventTime = 'Start time is required';
     if (!formData.genderSelection?.trim()) nextErrors.genderSelection = 'Gender is required';
+    if (formData.description.trim().length < 10) nextErrors.description = 'Description must be at least 10 characters';
     setErrors((prev) => ({ ...prev, ...nextErrors }));
     return Object.keys(nextErrors).length === 0;
   };
@@ -315,6 +342,8 @@ export default function EditEventScreen() {
         ticketPrice: formData.eventType === 'free' ? 0 : Number(formData.ticketPrice),
         email: user?.email || '',
         phone: user?.phone || undefined,
+        gender: genderToApi(formData.genderSelection),
+        category: (formData.category?.trim() || 'Other').toLowerCase() || 'other',
       };
       if (imageToSend !== undefined) updateData.image = imageToSend;
 
@@ -549,6 +578,14 @@ export default function EditEventScreen() {
             </View>
 
             <DataSelection
+              label="Category (optional)"
+              value={formData.category}
+              onSelect={(v) => handleInputChange('category', v)}
+              options={CATEGORY_OPTIONS.map((opt) => ({ value: opt, label: opt }))}
+              className="mb-3"
+            />
+
+            <DataSelection
               label="Gender"
               value={formData.genderSelection}
               onSelect={(v) => handleInputChange('genderSelection', v)}
@@ -558,12 +595,13 @@ export default function EditEventScreen() {
             />
 
             <DataInput
-              label="Description (optional)"
+              label="Description (min 10 characters)"
               placeholder="description"
               value={formData.description}
               onChangeText={(v) => handleInputChange('description', v)}
               multiline
               textAlignVertical="top"
+              error={errors.description}
               className="mb-6"
             />
 

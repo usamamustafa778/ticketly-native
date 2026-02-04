@@ -86,6 +86,7 @@ export default function RootLayout() {
           <Stack.Screen name="user/[id]" />
           <Stack.Screen name="ticket/[id]" />
           <Stack.Screen name="event-filter" />
+          <Stack.Screen name="events/[category]" />
           <Stack.Screen name="+not-found" />
         </Stack>
         <StatusBar style={colorScheme === 'dark' ? 'light' : 'dark'} />

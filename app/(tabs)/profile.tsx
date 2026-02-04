@@ -1,5 +1,6 @@
 import { EventCard } from '@/components/EventCard';
 import { EventCardSkeleton } from '@/components/EventCardSkeleton';
+import { UserProfileSkeleton } from '@/components/UserProfileSkeleton';
 import { ButtonPrimary } from '@/components/ui/ButtonPrimary';
 import { TabsRow } from '@/components/ui/Tabs';
 import { authAPI, PROFILE_CACHE_KEY, type PublicUserSummary } from '@/lib/api/auth';
@@ -496,9 +497,8 @@ export default function ProfileScreen() {
   // Show loading only while we check cache (so we don't flash "Login" when user is actually logged in)
   if (!user && !hasCheckedCache) {
     return (
-      <View className="flex-1 bg-white pt-[60px] items-center justify-center">
-        <ActivityIndicator size="large" color="#DC2626" />
-        <Text className="text-gray-600 mt-4">Loading profile...</Text>
+      <View className="flex-1 bg-white">
+        <UserProfileSkeleton />
       </View>
     );
   }

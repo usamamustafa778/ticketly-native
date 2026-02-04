@@ -35,6 +35,8 @@ export interface Event {
   time: string;
   location?: string;
   image?: string;
+  /** Full URL or path for event image (API may return this instead of/in addition to image) */
+  imageUrl?: string;
   email?: string;
   phone?: string;
   /** @deprecated Prefer price. Kept for backward compatibility. */
@@ -43,6 +45,7 @@ export interface Event {
   /** Paid { price, currency } or free { price: 'free', currency: null } */
   price?: EventPrice;
   gender?: 'male' | 'female' | 'all';
+  category?: string;
   organizerName?: string;
   status?: 'pending' | 'approved';
   ticketTheme?: TicketTheme;
@@ -81,6 +84,8 @@ export interface CreateEventRequest {
   organizerName?: string;
   phone?: string;
   gender: 'male' | 'female' | 'all';
+  /** Optional; default "other" on backend */
+  category?: string;
   /** Backend expects ticketPrice (number): 0 for free, amount for paid */
   ticketPrice: number;
   /** For paid events; optional for free */
@@ -99,6 +104,8 @@ export interface UpdateEventRequest {
   ticketPrice?: number;
   totalTickets?: number;
   gender?: 'male' | 'female' | 'all';
+  /** Optional; default "other" on backend */
+  category?: string;
   organizerName?: string;
   ticketTheme?: TicketTheme;
 }

@@ -11,6 +11,9 @@ import {
   Pressable,
   KeyboardAvoidingView,
   Platform,
+  Animated,
+  Easing,
+  StyleSheet,
 } from 'react-native';
 import Slider from '@react-native-community/slider';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
@@ -48,6 +51,108 @@ const LABELS: Partial<Record<keyof TicketTheme, string>> = {
   accentColor: 'Accent / divider / background',
   brandColor: 'Brand / logo',
 };
+
+const SKELETON_BG = '#E5E7EB';
+const SKELETON_BG_LIGHT = '#F3F4F6';
+
+function TicketThemeSkeleton() {
+  const insets = useSafeAreaInsets();
+  const opacity = useRef(new Animated.Value(0.35)).current;
+
+  useEffect(() => {
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(opacity, {
+          toValue: 0.65,
+          duration: 800,
+          useNativeDriver: true,
+          easing: Easing.inOut(Easing.ease),
+        }),
+        Animated.timing(opacity, {
+          toValue: 0.35,
+          duration: 800,
+          useNativeDriver: true,
+          easing: Easing.inOut(Easing.ease),
+        }),
+      ])
+    );
+    loop.start();
+    return () => loop.stop();
+  }, [opacity]);
+
+  return (
+    <View style={skeletonStyles.container}>
+      {/* Header */}
+      <View style={[skeletonStyles.header, { paddingTop: insets.top + 8 }]}>
+        <Animated.View style={[skeletonStyles.backBtn, { opacity }]} />
+        <Animated.View style={[skeletonStyles.titleBar, { opacity }]} />
+      </View>
+
+      <ScrollView
+        style={skeletonStyles.scroll}
+        contentContainerStyle={skeletonStyles.scrollContent}
+        showsVerticalScrollIndicator={false}
+      >
+        {/* Preview label + card */}
+        <Animated.View style={[skeletonStyles.labelShort, { opacity }]} />
+        <Animated.View style={[skeletonStyles.previewCard, { opacity }]} />
+
+        {/* Presets label + row */}
+        <Animated.View style={[skeletonStyles.labelShort, { opacity }]} />
+        <View style={skeletonStyles.presetsRow}>
+          {[0, 1, 2, 3, 4].map((i) => (
+            <View key={i} style={skeletonStyles.presetChip}>
+              <Animated.View style={[skeletonStyles.presetCircle, { opacity }]} />
+              <Animated.View style={[skeletonStyles.presetLabel, { opacity }]} />
+            </View>
+          ))}
+        </View>
+
+        {/* Background pattern label + slider */}
+        <Animated.View style={[skeletonStyles.labelShort, { opacity }]} />
+        <Animated.View style={[skeletonStyles.sliderBar, { opacity }]} />
+
+        {/* Customize colors label + rows */}
+        <Animated.View style={[skeletonStyles.labelShort, { opacity }]} />
+        {[0, 1, 2, 3, 4].map((i) => (
+          <View key={i} style={skeletonStyles.colorRow}>
+            <Animated.View style={[skeletonStyles.colorSwatch, { opacity }]} />
+            <Animated.View style={[skeletonStyles.colorLabel, { opacity }]} />
+          </View>
+        ))}
+
+        {/* Save button */}
+        <Animated.View style={[skeletonStyles.saveBtn, { opacity }]} />
+      </ScrollView>
+    </View>
+  );
+}
+
+const skeletonStyles = StyleSheet.create({
+  container: { flex: 1, backgroundColor: '#fff' },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingBottom: 12,
+    gap: 8,
+  },
+  backBtn: { width: 32, height: 32, borderRadius: 16, backgroundColor: SKELETON_BG },
+  titleBar: { height: 22, flex: 1, borderRadius: 6, backgroundColor: SKELETON_BG },
+  scroll: { flex: 1 },
+  scrollContent: { paddingHorizontal: 12, paddingBottom: 24, paddingTop: 12 },
+  labelShort: { height: 12, width: 80, borderRadius: 4, backgroundColor: SKELETON_BG, marginBottom: 8 },
+  previewCard: { height: 200, borderRadius: 12, backgroundColor: SKELETON_BG_LIGHT, marginBottom: 16 },
+  presetsRow: { flexDirection: 'row', gap: 8, marginBottom: 16 },
+  presetChip: { alignItems: 'center', minWidth: 64 },
+  presetCircle: { width: 36, height: 36, borderRadius: 8, backgroundColor: SKELETON_BG, marginBottom: 6 },
+  presetLabel: { height: 10, width: 40, borderRadius: 4, backgroundColor: SKELETON_BG },
+  sliderBar: { height: 32, borderRadius: 8, backgroundColor: SKELETON_BG_LIGHT, marginBottom: 16 },
+  colorRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: '#F3F4F6', gap: 8 },
+  colorSwatch: { width: 32, height: 32, borderRadius: 8, backgroundColor: SKELETON_BG },
+  colorLabel: { height: 12, flex: 1, borderRadius: 4, backgroundColor: SKELETON_BG_LIGHT },
+  saveBtn: { height: 44, borderRadius: 10, backgroundColor: SKELETON_BG, marginTop: 16 },
+});
 
 export default function EventTicketThemeScreen() {
   const router = useRouter();
@@ -142,26 +247,7 @@ export default function EventTicketThemeScreen() {
   };
 
   if (loading || !event) {
-    // Simple skeleton shimmer for ticket theme screen
-    return (
-      <View className="flex-1 bg-white px-3 pt-3">
-        <View className="flex-row items-center justify-between mb-3">
-          <View className="w-8 h-8 rounded-full bg-gray-200" />
-          <View className="w-32 h-4 rounded-full bg-gray-200" />
-          <View className="w-8 h-8 rounded-full bg-gray-200" />
-        </View>
-        <View className="rounded-xl h-56 bg-gray-200 mb-4" />
-        <View className="h-3 w-24 rounded-full bg-gray-200 mb-2" />
-        <View className="flex-row justify-between">
-          {Array.from({ length: 5 }).map((_, i) => (
-            <View key={i} className="w-14 items-center">
-              <View className="w-9 h-9 rounded-full bg-gray-200 mb-1" />
-              <View className="h-2 w-10 rounded-full bg-gray-200" />
-            </View>
-          ))}
-        </View>
-      </View>
-    ); 
+    return <TicketThemeSkeleton />;
   }
 
   const mergedTheme = mergeTicketTheme(theme);

@@ -387,6 +387,7 @@ export default function LoginScreen() {
               disabled={loading}
               onPress={handleSignup}
               className="mb-3"
+              size="lg"
             >
               Sign Up
             </ButtonPrimary>
@@ -413,6 +414,7 @@ export default function LoginScreen() {
                 setPassword('');
                 setErrorMessage('');
               }}
+              size="lg"
             >
               Back
             </ButtonSecondary>
@@ -488,6 +490,7 @@ export default function LoginScreen() {
               disabled={loading}
               onPress={handleEmailSubmit}
               className="mb-3"
+              size="lg"
             >
               Login
             </ButtonPrimary>
@@ -512,6 +515,7 @@ export default function LoginScreen() {
                 setPassword('');
                 setLoginError('');
               }}
+              size="lg"
             >
               Back
             </ButtonSecondary>
@@ -588,6 +592,7 @@ export default function LoginScreen() {
                 setTempToken('');
                 setOtpError('');
               }}
+              size="lg"
             >
               Back
             </ButtonSecondary>

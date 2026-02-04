@@ -1,10 +1,9 @@
-import { EventCard } from '@/components/EventCard';
 import { EventCardSkeleton } from '@/components/EventCardSkeleton';
 import { useAppStore } from '@/store/useAppStore';
 import { eventsAPI } from '@/lib/api/events';
 import { CACHE_KEYS, getCached, setCached } from '@/lib/cache';
-import { useRouter } from 'expo-router';
-import React, { useMemo, useState, useEffect, useRef } from 'react';
+import { useRouter, useFocusEffect } from 'expo-router';
+import React, { useMemo, useState, useEffect, useRef, useCallback } from 'react';
 import AnimatedReanimated, {
   useSharedValue,
   useAnimatedStyle,
@@ -16,7 +15,7 @@ import AnimatedReanimated, {
 import { getEventImageUrl, getProfileImageUrl } from '@/lib/utils/imageUtils';
 import {
   Animated,
-  FlatList,
+  Image,
   NativeScrollEvent,
   NativeSyntheticEvent,
   Text,
@@ -26,20 +25,45 @@ import {
   RefreshControl,
   ScrollView,
   Dimensions,
+  TouchableOpacity,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useBottomPadding } from '@/hooks/useBottomPadding';
 import { Modal } from '@/components/Modal';
+import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import type { Event } from '@/lib/api/events';
+import type { Event as AppEvent } from '@/data/mockData';
 
-// Helper function to convert API event to app event format
+const CATEGORY_ORDER = [
+  'Music',
+  'Sports',
+  'Technology',
+  'Conference',
+  'Workshop',
+  'Social',
+  'Arts',
+  'Education',
+  'Health',
+  'Business',
+  'Food & Drink',
+  'Community',
+  'Other',
+];
+
+function categoryForDisplay(apiCategory: string | undefined): string {
+  if (!apiCategory?.trim()) return 'Other';
+  const lower = apiCategory.trim().toLowerCase();
+  const found = CATEGORY_ORDER.find((o) => o.toLowerCase() === lower);
+  return found || 'Other';
+}
+
 function getEventPrice(apiEvent: Event): number {
   if (apiEvent.price?.price === 'free' || apiEvent.price?.currency === null) return 0;
   if (typeof apiEvent.price?.price === 'number') return apiEvent.price.price;
   return apiEvent.ticketPrice ?? 0;
 }
 
-const convertEvent = (apiEvent: Event) => {
+const convertEvent = (apiEvent: Event): AppEvent => {
   const location = apiEvent.location ?? '';
   const price = getEventPrice(apiEvent);
   return {
@@ -50,7 +74,7 @@ const convertEvent = (apiEvent: Event) => {
     time: apiEvent.time,
     venue: location,
     city: location.split(',')[0] || location,
-    category: 'Event',
+    category: categoryForDisplay(apiEvent.category),
     image: getEventImageUrl(apiEvent) || 'https://images.unsplash.com/photo-1470229722913-7c0e2dbbafd3?w=800',
     organizerId: apiEvent.createdBy?._id || '',
     organizerName: apiEvent.createdBy?.fullName || apiEvent.organizerName || 'Organizer',
@@ -67,6 +91,8 @@ const convertEvent = (apiEvent: Event) => {
     joinedCount: apiEvent.joinedCount ?? (apiEvent.joinedUsers?.length ?? 0),
   };
 };
+
+const IMAGE_GAP = 1;
 
 export default function ExploreScreen() {
   const router = useRouter();
@@ -86,19 +112,20 @@ export default function ExploreScreen() {
   // Dynamic bottom padding: Gestures (insets.bottom > 0) = safe area + 20px; Buttons (insets.bottom === 0) = 10px
   const bottomPadding = useBottomPadding();
 
-  useEffect(() => {
-    loadEvents();
-  }, []);
-
-  const loadEvents = async (showRefreshing = false) => {
-    // Public data: always try cache first (works for logged-in and logged-out users)
+  const loadEvents = useCallback(async (showRefreshing = false) => {
+    // Public data: try cache first for instant display, but skip cache that looks like Home data (category "Event" → all show as "Other")
     let hadCache = false;
     if (!showRefreshing) {
       const cached = await getCached<any[]>(CACHE_KEYS.EVENTS_APPROVED);
       if (cached && Array.isArray(cached) && cached.length > 0) {
-        hadCache = true;
-        setEvents(cached);
-        setLoading(false);
+        const hasRealCategories = cached.some(
+          (e: any) => e.category && e.category !== 'Event' && CATEGORY_ORDER.includes(e.category)
+        );
+        if (hasRealCategories) {
+          hadCache = true;
+          setEvents(cached);
+          setLoading(false);
+        }
       }
     }
     try {
@@ -119,7 +146,14 @@ export default function ExploreScreen() {
       setRefreshing(false);
       setIsBackgroundFetching(false);
     }
-  };
+  }, []);
+
+  // Run events API every time user enters Explore so categories are always correct (not overwritten by Home's "Event" category)
+  useFocusEffect(
+    useCallback(() => {
+      loadEvents();
+    }, [loadEvents])
+  );
 
   // Animated loading line - below top bar when cached/refreshing
   useEffect(() => {
@@ -157,12 +191,29 @@ export default function ExploreScreen() {
         event.title.toLowerCase().includes(query) ||
         event.description.toLowerCase().includes(query) ||
         event.venue.toLowerCase().includes(query) ||
-        event.city.toLowerCase().includes(query)
+        event.city.toLowerCase().includes(query) ||
+        (event.category && event.category.toLowerCase().includes(query))
     );
   }, [events, searchQuery]);
 
+  const eventsByCategory = useMemo(() => {
+    const groups: Record<string, AppEvent[]> = {};
+    for (const e of filteredEvents) {
+      const cat = e.category || 'Other';
+      if (!groups[cat]) groups[cat] = [];
+      groups[cat].push(e);
+    }
+    return groups;
+  }, [filteredEvents]);
+
+  const orderedCategories = useMemo(() => {
+    const fromOrder = CATEGORY_ORDER.filter((cat) => eventsByCategory[cat]?.length);
+    const rest = Object.keys(eventsByCategory).filter((cat) => !CATEGORY_ORDER.includes(cat));
+    return [...fromOrder, ...rest];
+  }, [eventsByCategory]);
+
   const safeTop = insets.top + 12;
-  const headerContentHeight = 56; // search/filter input row with padding
+  const headerContentHeight = 56;
   const headerHeight = safeTop + headerContentHeight;
 
   const handleScroll = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
@@ -196,15 +247,18 @@ export default function ExploreScreen() {
           className="bg-white shadow-xs overflow-hidden"
           style={{ paddingTop: safeTop }}
         >
-          {/* Search at top of page */}
-          <View className="px-3 pb-1">
-            <TextInput
-              className="bg-gray-50 border border-gray-200 rounded-md py-0.5 px-4 text-gray-900 text-sm"
-              placeholder="Search by event..."
-              placeholderTextColor="#6B7280"
-              value={searchQuery}
-              onChangeText={setSearchQuery}
-            />
+          {/* Search bar with icons (Pinterest-style) - same horizontal padding as Home */}
+          <View className="pb-2 flex-row items-center gap-2" style={{ paddingHorizontal: 2 }}>
+            <View className="flex-1 flex-row items-center bg-gray-100 rounded-xl px-3 py-2.5 gap-2">
+              <MaterialIcons name="search" size={22} color="#6B7280" />
+              <TextInput
+                className="flex-1 text-gray-900 text-base py-0"
+                placeholder="Search for events"
+                placeholderTextColor="#6B7280"
+                value={searchQuery}
+                onChangeText={setSearchQuery}
+              />
+            </View>
           </View>
           {/* Loading bar at bottom of top bar - when cached data + API running or pull-to-refresh */}
           {sBackgroundFetching && (
@@ -256,24 +310,16 @@ export default function ExploreScreen() {
           </View>
         </ScrollView>
       ) : (
-        <FlatList
-          data={filteredEvents}
+        <ScrollView
           style={{ flex: 1 }}
           contentContainerStyle={{
-            paddingTop: headerHeight - 20,
+            paddingTop: headerHeight,
             paddingHorizontal: 2,
             paddingBottom: bottomPadding,
           }}
           onScroll={handleScroll}
           scrollEventThrottle={16}
-          renderItem={({ item }) => (
-            <View className="flex-1">
-              <EventCard event={item} />
-            </View>
-          )}
-          keyExtractor={(item) => item.id}
-          numColumns={2}
-          columnWrapperStyle={{ gap: 4, marginBottom: 4 }}
+          showsVerticalScrollIndicator={false}
           refreshControl={
             <RefreshControl
               refreshing={refreshing}
@@ -282,12 +328,52 @@ export default function ExploreScreen() {
               colors={["#DC2626"]}
             />
           }
-          ListEmptyComponent={
-            <View className="flex-1 items-center justify-center py-15">
-              <Text className="text-[#6B7280] text-base">No events found</Text>
+        >
+          {orderedCategories.length === 0 ? (
+            <View className="items-center justify-center py-20" style={{ paddingHorizontal: 2 }}>
+              <MaterialIcons name="event-busy" size={56} color="#9CA3AF" />
+              <Text className="text-gray-500 text-base mt-4 text-center">No events found</Text>
             </View>
-          }
-        />
+          ) : (
+            orderedCategories.map((category) => {
+              const categoryEvents = eventsByCategory[category] || [];
+              const displayEvents = categoryEvents.slice(0, 4);
+              return (
+                <View key={category} className="mb-6">
+                  <View className="flex-row items-center justify-between px-2 mb-3">
+                    <Text className="text-gray-900 text-xl font-bold">{category}</Text>
+                    <TouchableOpacity
+                      onPress={() => router.push(`/events/${encodeURIComponent(category)}`)}
+                      className="w-9 h-9 rounded-full bg-gray-100 items-center justify-center"
+                    >
+                      <MaterialIcons name="search" size={20} color="#374151" />
+                    </TouchableOpacity>
+                  </View>
+                  <View
+                    className="flex-row mb-3 border border-transparent rounded-2xl overflow-hidden"
+                    style={{ gap: IMAGE_GAP }}
+                  >
+                    {displayEvents.map((event) => (
+                      <TouchableOpacity
+                        key={event.id}
+                        activeOpacity={0.85}
+                        style={{ flex: 1, aspectRatio: 2 / 4 }}
+                        onPress={() => router.push(`/event-details/${event.id}`)}
+                        className="overflow-hidden max-w-[50%] bg-gray-200"
+                      >
+                        <Image
+                          source={{ uri: event.image || 'https://images.unsplash.com/photo-1470229722913-7c0e2dbbafd3?w=800' }}
+                          className="w-full h-full "
+                          resizeMode="cover"
+                        />
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                </View>
+              );
+            })
+          )}
+        </ScrollView>
       )}
 
       <Modal

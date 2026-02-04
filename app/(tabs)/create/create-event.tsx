@@ -35,6 +35,7 @@ interface EventFormData {
   eventDate: Date | null;
   eventTime: string; // "HH:mm"
   address: string;
+  category: string;
   genderSelection: string;
   description: string;
   imageUri: string | null;
@@ -48,6 +49,23 @@ interface EventFormData {
 }
 
 const GENDER_OPTIONS = ['All', 'Male', 'Female'] as const;
+
+/** Category options; optional, default "Other" */
+const CATEGORY_OPTIONS = [
+  'Other',
+  'Music',
+  'Sports',
+  'Technology',
+  'Conference',
+  'Workshop',
+  'Social',
+  'Arts',
+  'Education',
+  'Health',
+  'Business',
+  'Food & Drink',
+  'Community',
+] as const;
 
 /** Currency options: code + label + flag emoji. For now only PKR. */
 const CURRENCY_OPTIONS = [
@@ -104,6 +122,7 @@ function deserializeDraft(raw: DraftData): { formData: EventFormData; step: 1 | 
       eventDate,
       eventTime: String(raw.eventTime ?? '18:00'),
       address: String(raw.address ?? ''),
+      category: String(raw.category ?? 'Other'),
       genderSelection: String(raw.genderSelection ?? 'All'),
       description: String(raw.description ?? ''),
       imageUri: raw.imageUri ?? null,
@@ -158,6 +177,7 @@ export default function CreateEventScreen() {
     eventDate: null,
     eventTime: '18:00',
     address: '',
+    category: 'Other',
     genderSelection: 'All',
     description: '',
     imageUri: null,
@@ -263,12 +283,13 @@ export default function CreateEventScreen() {
     }
   };
 
-  /** Required for step 1: event name, start date, start time, gender. Address and description are optional. */
+  /** Required for step 1: event name, start date, start time, gender, description (min 10 chars). */
   const step1Valid =
     Boolean(formData.eventName.trim()) &&
     Boolean(formData.eventDate) &&
     Boolean(formData.eventTime?.trim()) &&
-    Boolean(formData.genderSelection?.trim());
+    Boolean(formData.genderSelection?.trim()) &&
+    formData.description.trim().length >= 10;
 
   const validateStep1 = (): boolean => {
     const nextErrors: Partial<Record<keyof EventFormData, string>> = {};
@@ -276,6 +297,7 @@ export default function CreateEventScreen() {
     if (!formData.eventDate) nextErrors.eventDate = 'Start date is required';
     if (!formData.eventTime?.trim()) nextErrors.eventTime = 'Start time is required';
     if (!formData.genderSelection?.trim()) nextErrors.genderSelection = 'Gender is required';
+    if (formData.description.trim().length < 10) nextErrors.description = 'Description must be at least 10 characters';
     setErrors((prev) => ({ ...prev, ...nextErrors }));
     return Object.keys(nextErrors).length === 0;
   };
@@ -353,6 +375,7 @@ export default function CreateEventScreen() {
         email: user?.email || '',
         phone: user?.phone || undefined,
         gender: genderToApi(formData.genderSelection),
+        category: (formData.category?.trim() || 'Other').toLowerCase() || 'other',
         ticketPrice,
         totalTickets,
       });
@@ -588,6 +611,14 @@ export default function CreateEventScreen() {
             </View>
 
             <DataSelection
+              label="Category (optional)"
+              value={formData.category}
+              onSelect={(v) => handleInputChange('category', v)}
+              options={CATEGORY_OPTIONS.map((opt) => ({ value: opt, label: opt }))}
+              className="mb-3"
+            />
+
+            <DataSelection
               label="Gender"
               value={formData.genderSelection}
               onSelect={(v) => handleInputChange('genderSelection', v)}
@@ -597,12 +628,13 @@ export default function CreateEventScreen() {
             />
 
             <DataInput
-              label="Description (optional)"
+              label="Description (min 10 characters)"
               placeholder="description"
               value={formData.description}
               onChangeText={(v) => handleInputChange('description', v)}
               multiline
               textAlignVertical="top"
+              error={errors.description}
               className="mb-6"
             />
 

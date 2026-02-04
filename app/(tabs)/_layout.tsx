@@ -80,12 +80,19 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
+        name="notifications"
+        options={{
+          title: 'Notifications',
+          tabBarIcon: ({ color }) => (
+            <MaterialIcons name="notifications" size={24} color={color} />
+          ),
+        }}
+      />
+      <Tabs.Screen
         name="liked"
         options={{
           title: 'Liked',
-          tabBarIcon: ({ color }) => (
-            <MaterialIcons name="favorite" size={24} color={color} />
-          ),
+          href: null,
         }}
       />
        <Tabs.Screen

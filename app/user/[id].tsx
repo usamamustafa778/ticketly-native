@@ -20,6 +20,7 @@ import { CACHE_KEYS, getCached, setCached } from '@/lib/cache';
 import { getProfileImageUrl, getEventImageUrl } from '@/lib/utils/imageUtils';
 import { BackButton } from '@/components/BackButton';
 import { EventCard } from '@/components/EventCard';
+import { UserProfileSkeleton } from '@/components/UserProfileSkeleton';
 import { ButtonPrimary } from '@/components/ui/ButtonPrimary';
 import { TabsRow } from '@/components/ui/Tabs';
 import { useAppStore } from '@/store/useAppStore';
@@ -175,10 +176,7 @@ export default function UserProfileScreen() {
   if (loading && !profile) {
     return (
       <View className="flex-1 bg-white">
-        <View className="flex-1 items-center justify-center p-10">
-          <ActivityIndicator size="large" color="#DC2626" />
-          <Text className="text-gray-700 text-base mt-4">Loading profile...</Text>
-        </View>
+        <UserProfileSkeleton />
       </View>
     );
   }
