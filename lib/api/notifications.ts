@@ -1,4 +1,6 @@
+// Use same API base as auth, events, tickets (explicit baseURL so requests never use 8081)
 import apiClient from './client';
+import { API_BASE_URL } from '../config';
 
 export interface NotificationItem {
   _id: string;
@@ -31,22 +33,34 @@ export interface NotificationsResponse {
   pagination?: { page: number; limit: number; total: number };
 }
 
+const apiConfig = { baseURL: API_BASE_URL };
+
 export const notificationsAPI = {
   list: (params?: { read?: 'true' | 'false'; page?: number; limit?: number }) =>
-    apiClient.get<NotificationsResponse>('/notifications', { params }).then((r) => r.data),
+    apiClient
+      .get<NotificationsResponse>('/notifications', { ...apiConfig, params })
+      .then((r) => r.data),
 
   unreadCount: () =>
     apiClient
-      .get<{ success: boolean; count: number }>('/notifications/unread-count')
+      .get<{ success: boolean; count: number }>('/notifications/unread-count', apiConfig)
       .then((r) => r.data),
 
   markAsRead: (id: string) =>
     apiClient
-      .patch<{ success: boolean; notification: NotificationItem }>(`/notifications/${id}/read`)
+      .patch<{ success: boolean; notification: NotificationItem }>(
+        `/notifications/${id}/read`,
+        undefined,
+        apiConfig
+      )
       .then((r) => r.data),
 
   markAllAsRead: () =>
     apiClient
-      .patch<{ success: boolean; modifiedCount: number }>('/notifications/read-all')
+      .patch<{ success: boolean; modifiedCount: number }>(
+        '/notifications/read-all',
+        undefined,
+        apiConfig
+      )
       .then((r) => r.data),
 };
