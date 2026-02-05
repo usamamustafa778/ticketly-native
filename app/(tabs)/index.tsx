@@ -451,40 +451,6 @@ export default function HomeScreen() {
                   Explore events
                 </ButtonPrimary>
               )}
-              {activeFilter === 'following' && suggestedAccounts.length > 0 && (
-                <View className="w-full mt-8">
-                  <Text className="text-gray-900 text-base font-semibold mb-3">
-                    Suggested hosts for you
-                  </Text>
-                  {suggestedAccounts.map((account) => (
-                    <View
-                      key={account._id}
-                      className="flex-row items-center py-2 border-b border-gray-100"
-                    >
-                      <View className="w-10 h-10 rounded-full bg-primary items-center justify-center overflow-hidden mr-3">
-                        <Image
-                          source={{
-                            uri:
-                              getProfileImageUrl({ profileImageUrl: account.profileImageUrl }) ||
-                              'https://images.unsplash.com/photo-1494797710133-75adf6c1f4a3?w=200',
-                          }}
-                          className="w-full h-full"
-                          resizeMode="cover"
-                        />
-                      </View>
-                      <View className="flex-1">
-                        <Text className="text-gray-900 font-medium" numberOfLines={1}>
-                          {account.fullName || 'User'}
-                        </Text>
-                        <Text className="text-gray-500 text-xs" numberOfLines={1}>
-                          {account.reasonLabel}
-                        </Text>
-                      </View>
-                      <MaterialIcons name="chevron-right" size={20} color="#9CA3AF" />
-                    </View>
-                  ))}
-                </View>
-              )}
             </View>
           ) : (
             <View style={{ flexDirection: 'row' }}>
@@ -505,6 +471,42 @@ export default function HomeScreen() {
                       )}
                     </View>
                   ))}
+                </View>
+              ))}
+            </View>
+          )}
+
+          {/* Suggested hosts: always show in Following tab (whether or not there are events) */}
+          {activeFilter === 'following' && suggestedAccounts.length > 0 && (
+            <View className="w-full mt-8 px-1 pb-6">
+              <Text className="text-gray-900 text-base font-semibold mb-3">
+                Suggested hosts for you
+              </Text>
+              {suggestedAccounts.map((account) => (
+                <View
+                  key={account._id}
+                  className="flex-row items-center py-2 border-b border-gray-100"
+                >
+                  <View className="w-10 h-10 rounded-full bg-primary items-center justify-center overflow-hidden mr-3">
+                    <Image
+                      source={{
+                        uri:
+                          getProfileImageUrl({ profileImageUrl: account.profileImageUrl }) ||
+                          'https://images.unsplash.com/photo-1494797710133-75adf6c1f4a3?w=200',
+                      }}
+                      className="w-full h-full"
+                      resizeMode="cover"
+                    />
+                  </View>
+                  <View className="flex-1">
+                    <Text className="text-gray-900 font-medium" numberOfLines={1}>
+                      {account.fullName || 'User'}
+                    </Text>
+                    <Text className="text-gray-500 text-xs" numberOfLines={1}>
+                      {account.reasonLabel}
+                    </Text>
+                  </View>
+                  <MaterialIcons name="chevron-right" size={20} color="#9CA3AF" />
                 </View>
               ))}
             </View>
