@@ -3,6 +3,7 @@ import { EventCardSkeleton } from '@/components/EventCardSkeleton';
 import { Modal } from '@/components/Modal';
 import { ButtonPrimary } from '@/components/ui/ButtonPrimary';
 import { Tabs } from '@/components/ui/Tabs';
+import { useBottomPadding } from '@/hooks/useBottomPadding';
 import { authAPI, PROFILE_CACHE_KEY } from '@/lib/api/auth';
 import type { Event } from '@/lib/api/events';
 import { eventsAPI } from '@/lib/api/events';
@@ -13,18 +14,9 @@ import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useFocusEffect, useRouter } from 'expo-router';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import AnimatedReanimated, {
-  useSharedValue,
-  useAnimatedStyle,
-  withRepeat,
-  withSequence,
-  withTiming,
-  cancelAnimation,
-} from 'react-native-reanimated';
 import {
   Animated,
   Dimensions,
-  FlatList,
   PanResponder,
   Platform,
   RefreshControl,
@@ -32,8 +24,15 @@ import {
   Text,
   View,
 } from 'react-native';
+import AnimatedReanimated, {
+  cancelAnimation,
+  useAnimatedStyle,
+  useSharedValue,
+  withRepeat,
+  withSequence,
+  withTiming,
+} from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useBottomPadding } from '@/hooks/useBottomPadding';
 
 export type HomeFilter = 'explore' | 'following' | 'today' | 'upcoming';
 
@@ -81,6 +80,13 @@ const { width, height } = Dimensions.get('window');
 const CARD_WIDTH = width * 0.82; // 82% of screen width for better peek effect
 const CARD_SPACING = 16; // Space between cards
 const HORIZONTAL_PADDING = (width - CARD_WIDTH) / 2; // Center padding to center the cards
+
+// Masonry grid: 2 columns, 8 card heights (all used in rotation)
+const MASONRY_COLUMNS = 2;
+const MASONRY_GAP = 4;
+// Horizontal padding of page (x-axis) should match other pages: 4px
+const MASONRY_PADDING_H = 4;
+const CARD_HEIGHTS = [175, 200, 225, 250, 300, 325, 350, 375] as const;
 
 // Derive numeric price for cards: event.price { price, currency } or ticketPrice
 function getEventPrice(apiEvent: Event): number {
@@ -284,6 +290,27 @@ export default function HomeScreen() {
     return upcomingEvents.filter((event) => eventMatchesFilter(event, activeFilter, user?._id, joinedEventIds));
   }, [upcomingEvents, activeFilter, user?._id, joinedEventIds]);
 
+  // Masonry: assign each item a height from CARD_HEIGHTS (cycle so all 8 heights exist), then distribute by shortest column
+  type MasonrySlot = { item: any; height: number };
+  const masonryColumns = useMemo((): MasonrySlot[][] => {
+    const list = loading
+      ? Array.from({ length: 8 }, (_, i) => ({ id: `skeleton-${i}`, _skeleton: true } as any))
+      : filteredEvents;
+    // Cycle through all 8 heights so every height appears (item 0→175, 1→200, … 7→375, 8→175, …)
+    const slots: MasonrySlot[] = list.map((item, index) => ({
+      item,
+      height: CARD_HEIGHTS[index % CARD_HEIGHTS.length],
+    }));
+    const columns: MasonrySlot[][] = Array.from({ length: MASONRY_COLUMNS }, () => []);
+    const columnHeights: number[] = Array(MASONRY_COLUMNS).fill(0);
+    slots.forEach((slot) => {
+      const colIndex = columnHeights[0] <= columnHeights[1] ? 0 : 1;
+      columns[colIndex].push(slot);
+      columnHeights[colIndex] += slot.height + MASONRY_GAP;
+    });
+    return columns;
+  }, [loading, filteredEvents]);
+
   const safeTop = insets.top + 12;
   const filterRowHeight = 36;
   const headerHeight = safeTop + filterRowHeight;
@@ -367,59 +394,72 @@ export default function HomeScreen() {
         </View>
       </View>
 
-      {/* Content: FlatList like explore page */}
+      {/* Content: custom masonry grid (2 columns, no library) */}
       <View key={activeFilter} className="flex-1" style={{ minHeight: swipeAreaMinHeight }} {...filterPanResponder.panHandlers}>
-        <FlatList
-          data={loading ? Array.from({ length: 6 }, (_, i) => ({ id: `skeleton-${i}`, _skeleton: true } as any)) : filteredEvents}
+        <ScrollView
           style={{ flex: 1 }}
           contentContainerStyle={{
-            paddingTop:headerHeight,
-            paddingHorizontal: 2,
+            paddingTop: headerHeight,
+            paddingHorizontal: MASONRY_PADDING_H,
             paddingBottom: bottomPadding,
             flexGrow: 1,
             minHeight: height - 140,
           }}
-          keyExtractor={(item) => item.id}
-          numColumns={2}
-          columnWrapperStyle={{ gap: 4, marginBottom: 4 }}
-          renderItem={({ item }) => (
-            <View className="flex-1">
-              {item._skeleton ? <EventCardSkeleton /> : <EventCard event={item} />}
-            </View>
-          )}
           refreshControl={
             <RefreshControl
               refreshing={refreshing}
               onRefresh={onRefresh}
               tintColor="#DC2626"
-              colors={["#DC2626"]}
+              colors={['#DC2626']}
             />
           }
-          ListEmptyComponent={
-            !loading ? (
-              <View className="px-3 py-14 items-center justify-center">
-                <MaterialIcons name="event-busy" size={48} color="#4B5563" />
-                <Text className="text-[#9CA3AF] text-base font-medium mt-3">No data found</Text>
-                <Text className="text-[#6B7280] text-sm mt-1 text-center px-3">
-                  {activeFilter === 'following'
-                    ? "You haven't joined any events yet."
-                    : upcomingEvents.length === 0
-                      ? 'No events available yet.'
-                      : 'No events match this filter.'}
-                </Text>
-                {activeFilter === 'following' && (
-                  <ButtonPrimary
-                    size="lg"
-                    className="mt-6"
-                    onPress={() => setActiveFilter('explore')}
-                  >
-                    Explore events
-                  </ButtonPrimary>
-                )}
-              </View>
-            ) : null
-          }
-        />
+          showsVerticalScrollIndicator={false}
+        >
+          {filteredEvents.length === 0 && !loading ? (
+            <View className="px-3 py-14 items-center justify-center">
+              <MaterialIcons name="event-busy" size={48} color="#4B5563" />
+              <Text className="text-[#9CA3AF] text-base font-medium mt-3">No data found</Text>
+              <Text className="text-[#6B7280] text-sm mt-1 text-center px-3">
+                {activeFilter === 'following'
+                  ? "You haven't joined any events yet."
+                  : upcomingEvents.length === 0
+                    ? 'No events available yet.'
+                    : 'No events match this filter.'}
+              </Text>
+              {activeFilter === 'following' && (
+                <ButtonPrimary
+                  size="lg"
+                  className="mt-6"
+                  onPress={() => setActiveFilter('explore')}
+                >
+                  Explore events
+                </ButtonPrimary>
+              )}
+            </View>
+          ) : (
+            <View style={{ flexDirection: 'row' }}>
+              {masonryColumns.map((column, colIndex) => (
+                <View
+                  key={colIndex}
+                  style={{
+                    flex: 1,
+                    marginLeft: colIndex === 0 ? 0 : MASONRY_GAP,
+                  }}
+                >
+                  {column.map((slot) => (
+                    <View key={slot.item.id} style={{ marginBottom: MASONRY_GAP }}>
+                      {slot.item._skeleton ? (
+                        <EventCardSkeleton height={slot.height} />
+                      ) : (
+                        <EventCard event={slot.item} height={slot.height} />
+                      )}
+                    </View>
+                  ))}
+                </View>
+              ))}
+            </View>
+          )}
+        </ScrollView>
       </View>
 
       <Modal

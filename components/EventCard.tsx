@@ -9,9 +9,11 @@ import { LinearGradient } from 'expo-linear-gradient';
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 const DROPUP_HEIGHT = SCREEN_HEIGHT * 0.7;
 
-interface EventCardProps {
+export interface EventCardProps {
   event: Event;
   onPress?: () => void;
+  /** Masonry: card height in px (e.g. 175, 200, 225, 250, 300, 325, 350, 375) */
+  height?: number;
 }
 
 type JoinedUser = {
@@ -23,7 +25,11 @@ type JoinedUser = {
   profileImageUrl?: string | null;
 };
 
-export const EventCard: React.FC<EventCardProps> = ({ event, onPress }) => {
+const DEFAULT_CARD_HEIGHT = 220;
+
+export const EventCard: React.FC<EventCardProps> = ({ event, onPress, height: heightProp }) => {
+  const cardHeight = heightProp ?? DEFAULT_CARD_HEIGHT;
+  const isCompact = cardHeight <= 200;
   const router = useRouter();
   const [joinedUsersDropUpVisible, setJoinedUsersDropUpVisible] = useState(false);
 
@@ -60,7 +66,8 @@ export const EventCard: React.FC<EventCardProps> = ({ event, onPress }) => {
 
   return (
     <TouchableOpacity
-      className="rounded-xl overflow-hidden w-full h-[220px] relative"
+      className="rounded-xl overflow-hidden w-full relative"
+      style={{ height: cardHeight }}
       onPress={handlePress}
       activeOpacity={0.8}
     >
@@ -149,12 +156,12 @@ export const EventCard: React.FC<EventCardProps> = ({ event, onPress }) => {
           })}{' '}
           {event.time}
         </Text>
-        <Text className="text-white text-[14px] font-semibold mb-2" numberOfLines={1}>
+        <Text className={`text-white font-semibold ${isCompact ? 'text-[12px] mb-0' : 'text-[14px] mb-2'}`} numberOfLines={isCompact ? 1 : 1}>
           {event.title}
         </Text>
 
-        {/* Host row */}
-        {(() => {
+        {/* Host row - hide in half height for cleaner look */}
+        {!isCompact && (() => {
           const ev = event as any;
           const organizerId = ev.organizerId || ev.createdBy?._id || ev.createdBy?.id || '';
           const showHostRow = ev.organizerName || ev.createdBy?.fullName || organizerId;
@@ -193,6 +200,7 @@ export const EventCard: React.FC<EventCardProps> = ({ event, onPress }) => {
             </View>
           );
         })()}
+        {isCompact && <View className="h-2" />}
       </View>
 
       {/* Joined users drop-up (bottom to middle) */}

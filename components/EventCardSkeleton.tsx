@@ -1,8 +1,16 @@
 import React, { useEffect, useRef } from 'react';
 import { View, Animated, Easing, StyleSheet } from 'react-native';
 
-export const EventCardSkeleton: React.FC = () => {
+const DEFAULT_HEIGHT = 220;
+
+export interface EventCardSkeletonProps {
+  height?: number;
+}
+
+export const EventCardSkeleton: React.FC<EventCardSkeletonProps> = ({ height: heightProp }) => {
   const opacity = useRef(new Animated.Value(0.35)).current;
+  const cardHeight = heightProp ?? DEFAULT_HEIGHT;
+  const imageHeight = Math.max(60, Math.round(cardHeight * 0.65));
 
   useEffect(() => {
     const loop = Animated.loop(
@@ -26,22 +34,24 @@ export const EventCardSkeleton: React.FC = () => {
   }, [opacity]);
 
   return (
-    <View style={styles.card}>
+    <View style={[styles.card, { height: cardHeight }]}>
       {/* Image area */}
-      <Animated.View style={[styles.imageBlock, { opacity }]} />
+      <Animated.View style={[styles.imageBlock, { height: imageHeight, opacity }]} />
       {/* Price pill */}
-      <View style={styles.pricePill}>
+      <View style={[styles.pricePill, { bottom: imageHeight - 28 }]}>
         <Animated.View style={[styles.pricePillInner, { opacity }]} />
       </View>
-      {/* Content */}
+      {/* Content - hide host row for short cards */}
       <View style={styles.content}>
         <Animated.View style={[styles.lineShort, { opacity }]} />
         <Animated.View style={[styles.lineTitle1, { opacity }]} />
-        <Animated.View style={[styles.lineTitle2, { opacity }]} />
-        <View style={styles.hostRow}>
-          <Animated.View style={[styles.avatar, { opacity }]} />
-          <Animated.View style={[styles.lineHost, { opacity }]} />
-        </View>
+        {cardHeight > 200 && <Animated.View style={[styles.lineTitle2, { opacity }]} />}
+        {cardHeight > 200 && (
+          <View style={styles.hostRow}>
+            <Animated.View style={[styles.avatar, { opacity }]} />
+            <Animated.View style={[styles.lineHost, { opacity }]} />
+          </View>
+        )}
       </View>
     </View>
   );
@@ -56,12 +66,10 @@ const styles = StyleSheet.create({
   },
   imageBlock: {
     width: '100%',
-    height: 150,
     backgroundColor: '#FFE4E6', // rose-100
   },
   pricePill: {
     position: 'absolute',
-    bottom: 150 - 28,
     left: 12,
     borderRadius: 999,
     paddingHorizontal: 12,
