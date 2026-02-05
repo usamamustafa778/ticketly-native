@@ -274,17 +274,25 @@ export default function TicketScreen() {
     }
   };
 
+  // Small helper: wait one frame so layout/gradients/QR are fully committed before snapshotting
+  const waitForNextFrame = () =>
+    new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+
   // Capture ticket card as image and save to device gallery
   const handleDownloadTicket = async () => {
     if (Platform.OS === 'web') {
       Alert.alert('Not available', 'Saving to gallery is not available on web. Use the app on your phone to download the ticket.');
       return;
     }
-    if (!ticketCardRef.current) return;
+    const view = ticketCardRef.current;
+    if (!view) return;
     setDownloadingTicket(true);
     let capturedUri: string | null = null;
     try {
-      capturedUri = await captureRef(ticketCardRef, {
+      // In Android release, waiting one frame avoids "Failed to snapshot view tag" errors
+      await waitForNextFrame();
+
+      capturedUri = await captureRef(view, {
         format: 'jpg',
         quality: 0.95,
         result: 'tmpfile',
@@ -342,10 +350,13 @@ export default function TicketScreen() {
       Alert.alert('Not available', 'Sharing is not available on web. Use the app on your phone to share the ticket.');
       return;
     }
-    if (!ticketCardRef.current) return;
+    const view = ticketCardRef.current;
+    if (!view) return;
     try {
       setSharingTicket(true);
-      const uri = await captureRef(ticketCardRef, {
+      // Ensure layout is stable before capturing
+      await waitForNextFrame();
+      const uri = await captureRef(view, {
         format: 'jpg',
         quality: 0.95,
         result: 'tmpfile',

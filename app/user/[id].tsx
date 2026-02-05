@@ -86,7 +86,7 @@ export default function UserProfileScreen() {
       case 'following':
       case 'home':
       case 'index':
-        router.replace('/(tabs)/index');
+        router.replace('/(tabs)');
         return;
       case 'profile':
         router.replace('/(tabs)/profile');
@@ -108,6 +108,7 @@ export default function UserProfileScreen() {
   const [showCoverViewer, setShowCoverViewer] = useState(false);
   const [followLoading, setFollowLoading] = useState(false);
   const [listModal, setListModal] = useState<'followers' | 'following' | null>(null);
+  const [isBioExpanded, setIsBioExpanded] = useState(false);
 
   const isOtherUserProfile = !!profile && String(profile._id) !== String(currentUserId ?? '');
 
@@ -323,6 +324,24 @@ export default function UserProfileScreen() {
                   {profile.username && (
                     <Text className="text-gray-500 text-sm mt-0.5">@{profile.username}</Text>
                   )}
+                  {profile.companyName && (
+                    <Text className="text-primary text-sm font-semibold mt-0.5">
+                      {profile.companyName}
+                    </Text>
+                  )}
+                  {profile.bio && (
+                    <TouchableOpacity
+                      activeOpacity={0.7}
+                      onPress={() => setIsBioExpanded((prev) => !prev)}
+                    >
+                      <Text
+                        className="text-gray-600 text-sm mt-1"
+                        numberOfLines={isBioExpanded ? undefined : 3}
+                      >
+                        {profile.bio}
+                      </Text>
+                    </TouchableOpacity>
+                  )}
                 </View>
               </View>
 
@@ -349,10 +368,6 @@ export default function UserProfileScreen() {
                   {formatCount(createdCount)} events
                 </Text>
               </View>
-
-              {profile.companyName && (
-                <Text className="text-gray-600 text-sm mt-1">{profile.companyName}</Text>
-              )}
 
               {/* Action button: Follow (no DM/message) - show whenever viewing another user's profile */}
               <View className="flex-row gap-3 mt-4">

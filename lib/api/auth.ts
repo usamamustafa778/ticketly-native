@@ -29,6 +29,7 @@ export interface LoginResponse {
     fullName: string;
     username?: string;
     email: string;
+    bio?: string | null;
     authProvider?: string;
     role?: string;
     isVerified?: boolean;
@@ -58,6 +59,7 @@ export interface VerifyOtpResponse {
     phone?: string;
     companyName?: string;
     role?: string;
+    bio?: string | null;
   };
 }
 
@@ -118,6 +120,7 @@ export interface UserProfile {
   phone?: string;
   companyName?: string;
   role?: string;
+  bio?: string | null;
   profileImage?: string | null;
   profileImageUrl?: string | null;
    coverImageUrl?: string | null;
@@ -149,6 +152,7 @@ export interface PublicUserProfile {
   id?: string;
   username?: string;
   fullName: string;
+  bio?: string | null;
   profileImage?: string | null;
   profileImageUrl?: string | null;
   coverImageUrl?: string | null;
@@ -257,6 +261,7 @@ export const authAPI = {
     name?: string;
     email?: string;
     password?: string;
+    bio?: string;
     likedEventsVisibility?: 'public' | 'private';
     followersVisibility?: 'public' | 'private';
     followingVisibility?: 'public' | 'private';

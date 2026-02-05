@@ -86,7 +86,7 @@ export default function UserProfileScreen() {
       case 'following':
       case 'home':
       case 'index':
-        router.replace('/(tabs)/index');
+        router.replace('/(tabs)');
         return;
       case 'profile':
         router.replace('/(tabs)/profile');
@@ -108,6 +108,7 @@ export default function UserProfileScreen() {
   const [showCoverViewer, setShowCoverViewer] = useState(false);
   const [followLoading, setFollowLoading] = useState(false);
   const [listModal, setListModal] = useState<'followers' | 'following' | null>(null);
+  const [isBioExpanded, setIsBioExpanded] = useState(false);
 
   const isOtherUserProfile = !!profile && String(profile._id) !== String(currentUserId ?? '');
 
@@ -317,14 +318,6 @@ export default function UserProfileScreen() {
                 style={{ paddingTop: insets.top + 8, zIndex: 5 }}
               >
                 <BackButton variant="dark" onPress={handleBack} />
-                <View className="flex-row gap-2">
-                  <TouchableOpacity className="w-9 h-9 rounded-full bg-black/30 items-center justify-center" onPress={() => {}}>
-                    <MaterialIcons name="more-horiz" size={22} color="#fff" />
-                  </TouchableOpacity>
-                  <TouchableOpacity className="w-9 h-9 rounded-full bg-black/30 items-center justify-center" onPress={() => {}}>
-                    <MaterialIcons name="search" size={22} color="#fff" />
-                  </TouchableOpacity>
-                </View>
               </View>
             </View>
 
@@ -356,6 +349,7 @@ export default function UserProfileScreen() {
                   {profile.username && (
                     <Text className="text-gray-500 text-sm mt-0.5">@{profile.username}</Text>
                   )}
+                 
                 </View>
               </View>
 
@@ -383,9 +377,23 @@ export default function UserProfileScreen() {
                   {formatCount(createdCount)} events
                 </Text>
               </View>
-
               {profile.companyName && (
-                <Text className="text-gray-600 text-sm mt-1">{profile.companyName}</Text>
+                <Text className="text-primary text-sm font-semibold mt-0.5">
+                  {profile.companyName}
+                </Text>
+              )}
+              {profile.bio && (
+                <TouchableOpacity
+                  activeOpacity={0.7}
+                  onPress={() => setIsBioExpanded((prev) => !prev)}
+                >
+                  <Text
+                    className="text-gray-700 text-xs mt-1"
+                    numberOfLines={isBioExpanded ? undefined : 3}
+                  >
+                    {profile.bio}
+                  </Text>
+                </TouchableOpacity>
               )}
 
               {/* Action button: Follow - show whenever viewing another user's profile */}

@@ -99,6 +99,7 @@ export default function ProfileScreen() {
   const [showLogoutModal, setShowLogoutModal] = useState(false);
   const [showImageViewer, setShowImageViewer] = useState(false);
   const [showCoverViewer, setShowCoverViewer] = useState(false);
+  const [isBioExpanded, setIsBioExpanded] = useState(false);
   const [listModal, setListModal] = useState<'followers' | 'following' | null>(null);
   const hasLoadedRef = useRef(false);
   const currentUserIdRef = useRef<string | null>(null);
@@ -785,9 +786,7 @@ export default function ProfileScreen() {
                     {user.username && (
                       <Text className="text-gray-500 text-sm mt-0.5">@{user.username}</Text>
                     )}
-                    {user.companyName && (
-                      <Text className="text-primary text-sm font-semibold mt-0.5">{user.companyName}</Text>
-                    )}
+                   
                   </View>
                 </View>
 
@@ -815,6 +814,25 @@ export default function ProfileScreen() {
                     {createdEvents.length} events
                   </Text>
                 </View>
+                {(user as any).companyName && (
+                  <Text className="text-primary text-sm font-semibold mt-0.5">
+                    {(user as any).companyName}
+                  </Text>
+                )}
+                {(user as any).bio && (
+                  <TouchableOpacity
+                    activeOpacity={1}
+                    onPress={() => setIsBioExpanded((prev) => !prev)}
+                  >
+                    <Text
+                      className="text-gray-700 text-xs mt-1"
+                      numberOfLines={isBioExpanded ? undefined : 3}
+                    >
+                      {(user as any).bio}
+                    </Text>
+                  </TouchableOpacity>
+                )}
+
 
                 {/* Edit profile button (same style as user page) */}
                 <View className="flex-row gap-3 mt-4">

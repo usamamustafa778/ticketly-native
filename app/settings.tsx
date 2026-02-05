@@ -44,6 +44,7 @@ export default function SettingsScreen() {
   
   // Edit Profile state
   const [name, setName] = useState(user?.fullName || '');
+  const [bio, setBio] = useState((user as any)?.bio || '');
   const [likedEventsVisibility, setLikedEventsVisibility] = useState<'public' | 'private'>(
     (user as any)?.likedEventsVisibility || 'public'
   );
@@ -66,6 +67,7 @@ export default function SettingsScreen() {
   const [loadingEmail, setLoadingEmail] = useState(false);
   const [loadingPassword, setLoadingPassword] = useState(false);
   const [nameError, setNameError] = useState('');
+  const [bioError, setBioError] = useState('');
   const [emailError, setEmailError] = useState('');
   const [passwordError, setPasswordError] = useState('');
   const [showCurrentPassword, setShowCurrentPassword] = useState(false);
@@ -84,6 +86,7 @@ export default function SettingsScreen() {
     if (follVis === 'public' || follVis === 'private') setFollowersVisibility(follVis);
     const folVis = (user as any)?.followingVisibility;
     if (folVis === 'public' || folVis === 'private') setFollowingVisibility(folVis);
+    setBio((user as any)?.bio || '');
   }, [user]);
 
   const onRefresh = useCallback(async () => {
@@ -133,6 +136,33 @@ export default function SettingsScreen() {
       setNameError(error.response?.data?.message || 'Failed to update name. Please try again.');
     } finally {
       setLoadingName(false);
+    }
+  };
+
+  const handleUpdateBio = async () => {
+    const trimmed = bio.trim();
+    if (trimmed.length > 200) {
+      setBioError('Bio must be 200 characters or less');
+      return;
+    }
+    if (trimmed === ((user as any)?.bio || '')) {
+      setShowInfoModal(true);
+      return;
+    }
+    setBioError('');
+    try {
+      const response = await authAPI.updateUser({ bio: trimmed });
+      if (response.success) {
+        if (response.user) {
+          setUser(response.user);
+        }
+        setSuccessModalMessage('Bio updated successfully');
+        setShowSuccessModal(true);
+      } else {
+        setBioError(response.message || 'Failed to update bio');
+      }
+    } catch (error: any) {
+      setBioError(error.response?.data?.message || 'Failed to update bio. Please try again.');
     }
   };
 
@@ -329,6 +359,28 @@ export default function SettingsScreen() {
               >
                 Update Name
               </ButtonPrimary>
+              <View className="mt-6">
+                <DataInput
+                  label="Bio (optional)"
+                  placeholder="Tell people what kind of events you host or enjoy"
+                  value={bio}
+                  onChangeText={(text) => {
+                    setBio(text);
+                    if (bioError) setBioError('');
+                  }}
+                  error={bioError}
+                  multiline
+                  numberOfLines={3}
+                  className="mb-3"
+                />
+                <ButtonPrimary
+                  disabled={false}
+                  onPress={handleUpdateBio}
+                  size="lg"
+                >
+                  Update Bio
+                </ButtonPrimary>
+              </View>
             </View>
           </CollapsibleSection>
 
