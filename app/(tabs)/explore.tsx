@@ -1,4 +1,3 @@
-import { EventCardSkeleton } from '@/components/EventCardSkeleton';
 import { useAppStore } from '@/store/useAppStore';
 import { eventsAPI } from '@/lib/api/events';
 import { CACHE_KEYS, getCached, setCached } from '@/lib/cache';
@@ -15,6 +14,7 @@ import AnimatedReanimated, {
 import { getEventImageUrl, getProfileImageUrl } from '@/lib/utils/imageUtils';
 import {
   Animated,
+  Easing,
   Image,
   NativeScrollEvent,
   NativeSyntheticEvent,
@@ -93,6 +93,44 @@ const convertEvent = (apiEvent: Event): AppEvent => {
 };
 
 const IMAGE_GAP = 1;
+
+// Skeleton tile for Explore grid (matches 2-column image layout)
+const ExploreSkeletonTile: React.FC = () => {
+  const opacity = React.useRef(new Animated.Value(0.35)).current;
+
+  React.useEffect(() => {
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(opacity, {
+          toValue: 0.65,
+          duration: 800,
+          useNativeDriver: true,
+          easing: Easing.inOut(Easing.ease),
+        }),
+        Animated.timing(opacity, {
+          toValue: 0.35,
+          duration: 800,
+          useNativeDriver: true,
+          easing: Easing.inOut(Easing.ease),
+        }),
+      ])
+    );
+    loop.start();
+    return () => loop.stop();
+  }, [opacity]);
+
+  return (
+    <Animated.View
+      style={{
+        flex: 1,
+        aspectRatio: 2 / 4,
+        borderRadius: 16,
+        backgroundColor: '#FFE4E6', // light rose, matches EventCardSkeleton palette
+        opacity,
+      }}
+    />
+  );
+};
 
 export default function ExploreScreen() {
   const router = useRouter();
@@ -301,13 +339,20 @@ export default function ExploreScreen() {
             />
           }
         >
-          <View className="flex-row flex-wrap" style={{ gap: 2 }}>
-            {[1, 2, 3, 4, 5, 6].map((i) => (
-              <View key={i} className="flex-1 min-w-[48%]">
-                <EventCardSkeleton />
+          {/* Skeleton: 2-column image grid to match Explore layout */}
+          {Array.from({ length: 6 }).map((_, rowIndex) => (
+            <View
+              key={rowIndex}
+              style={{ flexDirection: 'row', marginBottom: 6 }}
+            >
+              <View style={{ flex: 1, marginRight: IMAGE_GAP }}>
+                <ExploreSkeletonTile />
               </View>
-            ))}
-          </View>
+              <View style={{ flex: 1, marginLeft: IMAGE_GAP }}>
+                <ExploreSkeletonTile />
+              </View>
+            </View>
+          ))}
         </ScrollView>
       ) : (
         <ScrollView

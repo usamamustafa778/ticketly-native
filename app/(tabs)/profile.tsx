@@ -1012,7 +1012,10 @@ export default function ProfileScreen() {
                   className="flex-row items-center py-3 px-4 border-b border-gray-100"
                   onPress={() => {
                     setListModal(null);
-                    if (item._id !== user?._id) router.push(`/user/${item._id}`);
+                    if (item._id !== user?._id) {
+                      // Coming from profile tab
+                      router.push(`/(tabs)/user/${item._id}?comeFrom=profile`);
+                    }
                   }}
                   activeOpacity={0.7}
                 >

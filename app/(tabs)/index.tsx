@@ -17,13 +17,14 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Animated,
   Dimensions,
+  Image,
   PanResponder,
   Platform,
   RefreshControl,
   ScrollView,
   Text,
+  TouchableOpacity,
   View,
-  Image,
 } from 'react-native';
 import AnimatedReanimated, {
   cancelAnimation,
@@ -87,7 +88,7 @@ const MASONRY_COLUMNS = 2;
 const MASONRY_GAP = 4;
 // Horizontal padding of page (x-axis) should match other pages: 4px
 const MASONRY_PADDING_H = 4;
-const CARD_HEIGHTS = [175, 200, 225, 250, 300, 325, 350, 375] as const;
+const CARD_HEIGHTS = [175, 225, 350, 250, 200, 325, 300, 375] as const;
 
 // Derive numeric price for cards: event.price { price, currency } or ticketPrice
 function getEventPrice(apiEvent: Event): number {
@@ -482,33 +483,45 @@ export default function HomeScreen() {
               <Text className="text-gray-900 text-base font-semibold mb-3">
                 Suggested hosts for you
               </Text>
-              {suggestedAccounts.map((account) => (
-                <View
-                  key={account._id}
-                  className="flex-row items-center py-2 border-b border-gray-100"
-                >
-                  <View className="w-10 h-10 rounded-full bg-primary items-center justify-center overflow-hidden mr-3">
-                    <Image
-                      source={{
-                        uri:
-                          getProfileImageUrl({ profileImageUrl: account.profileImageUrl }) ||
-                          'https://images.unsplash.com/photo-1494797710133-75adf6c1f4a3?w=200',
-                      }}
-                      className="w-full h-full"
-                      resizeMode="cover"
-                    />
-                  </View>
-                  <View className="flex-1">
-                    <Text className="text-gray-900 font-medium" numberOfLines={1}>
-                      {account.fullName || 'User'}
-                    </Text>
-                    <Text className="text-gray-500 text-xs" numberOfLines={1}>
-                      {account.reasonLabel}
-                    </Text>
-                  </View>
-                  <MaterialIcons name="chevron-right" size={20} color="#9CA3AF" />
-                </View>
-              ))}
+              {suggestedAccounts.map((account) => {
+                const accountId = account._id || account.id;
+                const canNavigate = Boolean(accountId);
+                const handlePress = () => {
+                  if (!canNavigate) return;
+                  // Open profile inside tabs and remember origin (following tab on home)
+                  router.push(`/(tabs)/user/${accountId}?comeFrom=${encodeURIComponent(activeFilter)}`);
+                };
+                return (
+                  <TouchableOpacity
+                    key={account._id}
+                    className="flex-row items-center py-2 border-b border-gray-100"
+                    activeOpacity={0.8}
+                    onPress={handlePress}
+                    disabled={!canNavigate}
+                  >
+                    <View className="w-10 h-10 rounded-full bg-primary items-center justify-center overflow-hidden mr-3">
+                      <Image
+                        source={{
+                          uri:
+                            getProfileImageUrl({ profileImageUrl: account.profileImageUrl }) ||
+                            'https://images.unsplash.com/photo-1494797710133-75adf6c1f4a3?w=200',
+                        }}
+                        className="w-full h-full"
+                        resizeMode="cover"
+                      />
+                    </View>
+                    <View className="flex-1">
+                      <Text className="text-gray-900 font-medium" numberOfLines={1}>
+                        {account.fullName || 'User'}
+                      </Text>
+                      <Text className="text-gray-500 text-xs" numberOfLines={1}>
+                        {account.reasonLabel}
+                      </Text>
+                    </View>
+                    <MaterialIcons name="chevron-right" size={20} color="#9CA3AF" />
+                  </TouchableOpacity>
+                );
+              })}
             </View>
           )}
         </ScrollView>

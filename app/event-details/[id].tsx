@@ -618,7 +618,15 @@ export default function EventDetailsScreen() {
             <TouchableOpacity
               onPress={() => {
                 const organizerId = (event.createdBy as any)?._id || (event as any).organizerId;
-                if (organizerId) router.push(`/user/${organizerId}`);
+                if (organizerId) {
+                  // Preserve origin when navigating from event → organizer profile
+                  const origin = (returnTo || '').toString();
+                  if (origin) {
+                    router.push(`/(tabs)/user/${organizerId}?comeFrom=${encodeURIComponent(origin)}`);
+                  } else {
+                    router.push(`/user/${organizerId}`);
+                  }
+                }
               }}
               activeOpacity={0.7}
               disabled={!((event.createdBy as any)?._id || (event as any).organizerId)}

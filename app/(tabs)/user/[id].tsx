@@ -1,30 +1,29 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
-import {
-  View,
-  Text,
-  FlatList,
-  TouchableOpacity,
-  Image,
-  ActivityIndicator,
-  RefreshControl,
-  Platform,
-  Modal as RNModal,
-  Pressable,
-  PanResponder,
-  Dimensions,
-} from 'react-native';
-import { useRouter, useLocalSearchParams } from 'expo-router';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import MaterialIcons from '@expo/vector-icons/MaterialIcons';
-import { authAPI, type PublicUserProfile, type PublicUserSummary } from '@/lib/api/auth';
-import { CACHE_KEYS, getCached, setCached } from '@/lib/cache';
-import { getProfileImageUrl, getEventImageUrl } from '@/lib/utils/imageUtils';
 import { BackButton } from '@/components/BackButton';
 import { EventCard } from '@/components/EventCard';
 import { UserProfileSkeleton } from '@/components/UserProfileSkeleton';
 import { ButtonPrimary } from '@/components/ui/ButtonPrimary';
 import { TabsRow } from '@/components/ui/Tabs';
+import { authAPI, type PublicUserProfile, type PublicUserSummary } from '@/lib/api/auth';
+import { CACHE_KEYS, getCached, setCached } from '@/lib/cache';
+import { getEventImageUrl, getProfileImageUrl } from '@/lib/utils/imageUtils';
 import { useAppStore } from '@/store/useAppStore';
+import MaterialIcons from '@expo/vector-icons/MaterialIcons';
+import { useLocalSearchParams, useRouter } from 'expo-router';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import {
+    ActivityIndicator,
+    Dimensions,
+    FlatList,
+    Image,
+    PanResponder,
+    Pressable,
+    RefreshControl,
+    Modal as RNModal,
+    Text,
+    TouchableOpacity,
+    View
+} from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 type TabKey = 'created' | 'joined' | 'liked';
 
@@ -69,13 +68,31 @@ function convertEvent(apiEvent: any) {
 
 export default function UserProfileScreen() {
   const router = useRouter();
-  const { id, returnTo } = useLocalSearchParams<{ id: string; returnTo?: string }>();
+  const { id, returnTo, comeFrom } = useLocalSearchParams<{ id: string; returnTo?: string; comeFrom?: string }>();
   const insets = useSafeAreaInsets();
+  const origin = (comeFrom || returnTo || '').toString();
+
   const handleBack = () => {
-    if (returnTo === 'notifications') {
-      router.replace('/(tabs)/notifications');
-    } else {
-      router.back();
+    switch (origin) {
+      case 'notifications':
+        router.replace('/(tabs)/notifications');
+        return;
+      case 'search':
+      case 'explore':
+        router.replace('/(tabs)/explore');
+        return;
+      case 'today':
+      case 'upcoming':
+      case 'following':
+      case 'home':
+      case 'index':
+        router.replace('/(tabs)/index');
+        return;
+      case 'profile':
+        router.replace('/(tabs)/profile');
+        return;
+      default:
+        router.back();
     }
   };
   const currentUser = useAppStore((s) => s.user);
@@ -529,7 +546,10 @@ export default function UserProfileScreen() {
                   className="flex-row items-center py-3 px-4 border-b border-gray-100"
                   onPress={() => {
                     setListModal(null);
-                    if (item._id !== id) router.push(`/user/${item._id}`);
+                    if (item._id !== id) {
+                      const origin = (comeFrom || returnTo || 'profile').toString();
+                      router.push(`/(tabs)/user/${item._id}?comeFrom=${encodeURIComponent(origin)}`);
+                    }
                   }}
                   activeOpacity={0.7}
                 >

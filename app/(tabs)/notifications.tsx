@@ -92,6 +92,7 @@ export default function NotificationsScreen() {
   const insets = useSafeAreaInsets();
   const bottomPadding = useBottomPadding();
   const user = useAppStore((state) => state.user);
+  const isAuthenticated = useAppStore((state) => state.isAuthenticated);
   const setNotificationUnreadCount = useAppStore((state) => state.setNotificationUnreadCount);
 
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
@@ -101,7 +102,10 @@ export default function NotificationsScreen() {
   const [markingAll, setMarkingAll] = useState(false);
 
   const fetchData = useCallback(async (isRefreshing = false) => {
-    if (!user?._id) {
+    // Only block when the app knows the user is logged out.
+    // This avoids a brief \"signed out\" flash if the user object is still hydrating
+    // but auth tokens are valid and user is effectively logged in.
+    if (!isAuthenticated) {
       setNotifications([]);
       setUnreadCount(0);
       setNotificationUnreadCount(0);
@@ -128,7 +132,7 @@ export default function NotificationsScreen() {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [user?._id]);
+  }, [isAuthenticated]);
 
   useFocusEffect(
     useCallback(() => {
@@ -153,9 +157,11 @@ export default function NotificationsScreen() {
       } catch (_) {}
     }
     if (item.eventId?._id) {
+      // Open event detail with explicit returnTo so back goes to Notifications
       router.push(`/event-details/${item.eventId._id}?returnTo=notifications`);
     } else if (item.actorUserId?._id) {
-      router.push(`/user/${item.actorUserId._id}?returnTo=notifications`);
+      // Open user profile inside the tabs group and tag origin so back goes to Notifications
+      router.push(`/(tabs)/user/${item.actorUserId._id}?comeFrom=notifications`);
     }
   };
 
@@ -175,7 +181,9 @@ export default function NotificationsScreen() {
     }
   };
 
-  if (!user?._id) {
+  // Show sign-in message only when the app is actually logged out,
+  // not just when the user object is temporarily missing an _id.
+  if (!isAuthenticated) {
     return (
       <View className="flex-1 bg-white justify-center items-center px-6">
         <MaterialIcons name="notifications-none" size={48} color="#D1D5DB" />
