@@ -70,6 +70,19 @@ export interface Event {
   updatedAt?: string;
 }
 
+export type SuggestionReasonType = 'interest' | 'trending' | 'social_proof' | 'curated';
+
+export interface SuggestedAccount {
+  _id: string;
+  id?: string;
+  fullName: string;
+  username?: string;
+  profileImageUrl?: string | null;
+  reasonType: SuggestionReasonType;
+  /** Human-friendly label like "Matches your interests" */
+  reasonLabel: string;
+}
+
 export interface CreateEventRequest {
   title: string;
   date: string;
@@ -114,6 +127,13 @@ export interface EventsResponse {
   success: boolean;
   count: number;
   events: Event[];
+  /** Optional personalized data when user is logged in */
+  suggestedData?: {
+    /** Events from accounts the user follows (for Following tab) */
+    events: Event[];
+    /** Suggested accounts with reason labels */
+    suggestedAccounts: SuggestedAccount[];
+  } | null;
 }
 
 export interface EventResponse {

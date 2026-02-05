@@ -5,7 +5,7 @@ import { ButtonPrimary } from '@/components/ui/ButtonPrimary';
 import { Tabs } from '@/components/ui/Tabs';
 import { useBottomPadding } from '@/hooks/useBottomPadding';
 import { authAPI, PROFILE_CACHE_KEY } from '@/lib/api/auth';
-import type { Event } from '@/lib/api/events';
+import type { Event, SuggestedAccount } from '@/lib/api/events';
 import { eventsAPI } from '@/lib/api/events';
 import { CACHE_KEYS, getCached, setCached } from '@/lib/cache';
 import { getEventImageUrl, getProfileImageUrl } from '@/lib/utils/imageUtils';
@@ -23,6 +23,7 @@ import {
   ScrollView,
   Text,
   View,
+  Image,
 } from 'react-native';
 import AnimatedReanimated, {
   cancelAnimation,
@@ -133,6 +134,8 @@ export default function HomeScreen() {
   const insets = useSafeAreaInsets();
   const [featuredEvents, setFeaturedEvents] = useState<any[]>([]);
   const [upcomingEvents, setUpcomingEvents] = useState<any[]>([]);
+  const [followingEvents, setFollowingEvents] = useState<any[]>([]);
+  const [suggestedAccounts, setSuggestedAccounts] = useState<SuggestedAccount[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [activeFilter, setActiveFilter] = useState<HomeFilter>('explore');
@@ -215,6 +218,7 @@ export default function HomeScreen() {
         hadCache = true;
         setEvents(cached);
         setUpcomingEvents(cached);
+        // Do not hydrate following/suggested from cache yet – they are user-specific
         const featured = cached.slice(0, Math.min(5, cached.length));
         setFeaturedEvents(featured);
         animatedScales.current = featured.map((_, index) =>
@@ -233,6 +237,17 @@ export default function HomeScreen() {
         await setCached(CACHE_KEYS.EVENTS_APPROVED, convertedEvents);
         setEvents(convertedEvents);
         setUpcomingEvents(convertedEvents);
+
+        // Personalized following feed + suggested accounts (only when logged-in backend includes them)
+        if (response.suggestedData) {
+          const followingConverted = (response.suggestedData.events || []).map(convertEvent);
+          setFollowingEvents(followingConverted);
+          setSuggestedAccounts(response.suggestedData.suggestedAccounts || []);
+        } else {
+          setFollowingEvents([]);
+          setSuggestedAccounts([]);
+        }
+
         if (convertedEvents.length > 0) {
           const featured = convertedEvents.slice(0, Math.min(5, convertedEvents.length));
           setFeaturedEvents(featured);
@@ -287,8 +302,9 @@ export default function HomeScreen() {
 
   const filteredEvents = useMemo(() => {
     if (activeFilter === 'upcoming') return upcomingEvents;
+    if (activeFilter === 'following') return followingEvents;
     return upcomingEvents.filter((event) => eventMatchesFilter(event, activeFilter, user?._id, joinedEventIds));
-  }, [upcomingEvents, activeFilter, user?._id, joinedEventIds]);
+  }, [upcomingEvents, followingEvents, activeFilter, user?._id, joinedEventIds]);
 
   // Masonry: assign each item a height from CARD_HEIGHTS (cycle so all 8 heights exist), then distribute by shortest column
   type MasonrySlot = { item: any; height: number };
@@ -421,7 +437,7 @@ export default function HomeScreen() {
               <Text className="text-[#9CA3AF] text-base font-medium mt-3">No data found</Text>
               <Text className="text-[#6B7280] text-sm mt-1 text-center px-3">
                 {activeFilter === 'following'
-                  ? "You haven't joined any events yet."
+                  ? "You’re not seeing any events from people you follow yet."
                   : upcomingEvents.length === 0
                     ? 'No events available yet.'
                     : 'No events match this filter.'}
@@ -434,6 +450,40 @@ export default function HomeScreen() {
                 >
                   Explore events
                 </ButtonPrimary>
+              )}
+              {activeFilter === 'following' && suggestedAccounts.length > 0 && (
+                <View className="w-full mt-8">
+                  <Text className="text-gray-900 text-base font-semibold mb-3">
+                    Suggested hosts for you
+                  </Text>
+                  {suggestedAccounts.map((account) => (
+                    <View
+                      key={account._id}
+                      className="flex-row items-center py-2 border-b border-gray-100"
+                    >
+                      <View className="w-10 h-10 rounded-full bg-primary items-center justify-center overflow-hidden mr-3">
+                        <Image
+                          source={{
+                            uri:
+                              getProfileImageUrl({ profileImageUrl: account.profileImageUrl }) ||
+                              'https://images.unsplash.com/photo-1494797710133-75adf6c1f4a3?w=200',
+                          }}
+                          className="w-full h-full"
+                          resizeMode="cover"
+                        />
+                      </View>
+                      <View className="flex-1">
+                        <Text className="text-gray-900 font-medium" numberOfLines={1}>
+                          {account.fullName || 'User'}
+                        </Text>
+                        <Text className="text-gray-500 text-xs" numberOfLines={1}>
+                          {account.reasonLabel}
+                        </Text>
+                      </View>
+                      <MaterialIcons name="chevron-right" size={20} color="#9CA3AF" />
+                    </View>
+                  ))}
+                </View>
               )}
             </View>
           ) : (
