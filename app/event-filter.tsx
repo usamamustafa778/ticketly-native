@@ -7,8 +7,20 @@ import { CACHE_KEYS, getCached, setCached } from '@/lib/cache';
 import { getEventImageUrl, getProfileImageUrl } from '@/lib/utils/imageUtils';
 import { useAppStore } from '@/store/useAppStore';
 import { useRouter } from 'expo-router';
-import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { View, Text, FlatList, RefreshControl, ScrollView, TouchableOpacity, PanResponder, Dimensions, Platform } from 'react-native';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import {
+  View,
+  Text,
+  FlatList,
+  RefreshControl,
+  ScrollView,
+  TouchableOpacity,
+  Dimensions,
+  LayoutChangeEvent,
+  NativeSyntheticEvent,
+  NativeScrollEvent,
+  Platform,
+} from 'react-native';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useBottomPadding } from '@/hooks/useBottomPadding';
@@ -160,36 +172,30 @@ export default function EventFilterScreen() {
   const bottomPadding = useBottomPadding();
   const filterScrollRef = useRef<ScrollView | null>(null);
   const tabLayoutsRef = useRef<Record<string, { x: number; width: number }>>({});
-  const activeFilterRef = useRef(activeFilter);
-  activeFilterRef.current = activeFilter;
-
   const { height } = Dimensions.get('window');
-  const SWIPE_THRESHOLD = 40;
-  const filterPanResponder = useRef(
-    PanResponder.create({
-      onStartShouldSetPanResponder: () => false,
-      onStartShouldSetPanResponderCapture: () => false,
-      onMoveShouldSetPanResponder: (_, gestureState) => {
-        const { dx, dy } = gestureState;
-        return Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > 35;
-      },
-      onMoveShouldSetPanResponderCapture: (_, gestureState) => {
-        const { dx, dy } = gestureState;
-        return Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > 35;
-      },
-      onPanResponderTerminationRequest: () => false,
-      onPanResponderRelease: (_, gestureState) => {
-        const { dx } = gestureState;
-        const currentFilter = activeFilterRef.current;
-        const idx = DATE_FILTER_OPTIONS.findIndex((f) => f.key === currentFilter);
-        if (dx < -SWIPE_THRESHOLD && idx < DATE_FILTER_OPTIONS.length - 1) {
-          setActiveFilter(DATE_FILTER_OPTIONS[idx + 1].key);
-        } else if (dx > SWIPE_THRESHOLD && idx > 0) {
-          setActiveFilter(DATE_FILTER_OPTIONS[idx - 1].key);
-        }
-      },
-    })
-  ).current;
+  const [pagerWidth, setPagerWidth] = useState(Dimensions.get('window').width);
+  const pagerRef = useRef<ScrollView>(null);
+
+  const handleTabSelect = useCallback((key: DateFilter) => {
+    setActiveFilter(key);
+    const index = DATE_FILTER_OPTIONS.findIndex((f) => f.key === key);
+    if (index >= 0) pagerRef.current?.scrollTo({ x: index * pagerWidth, animated: true });
+  }, [pagerWidth]);
+
+  const handlePagerScrollEnd = useCallback(
+    (e: NativeSyntheticEvent<NativeScrollEvent>) => {
+      const x = e.nativeEvent.contentOffset.x;
+      const index = Math.round(x / pagerWidth);
+      const tab = DATE_FILTER_OPTIONS[Math.max(0, Math.min(index, DATE_FILTER_OPTIONS.length - 1))].key;
+      setActiveFilter(tab);
+    },
+    [pagerWidth]
+  );
+
+  const handlePagerLayout = useCallback((e: LayoutChangeEvent) => {
+    const w = e.nativeEvent.layout.width;
+    if (w > 0) setPagerWidth(w);
+  }, []);
 
   useEffect(() => {
     loadEvents();
@@ -218,6 +224,16 @@ export default function EventFilterScreen() {
   const filteredEvents = useMemo(() => {
     return events.filter((e) => eventMatchesDateFilter(e, activeFilter));
   }, [events, activeFilter]);
+
+  const listDataByFilter = useMemo(() => {
+    const byKey: Record<DateFilter, any[]> = {} as any;
+    DATE_FILTER_OPTIONS.forEach(({ key }) => {
+      byKey[key] = loading
+        ? Array.from({ length: 6 }, (_, i) => ({ id: `skeleton-${key}-${i}`, _skeleton: true } as any))
+        : events.filter((e) => eventMatchesDateFilter(e, key));
+    });
+    return byKey;
+  }, [events, loading]);
 
   const safeTop = insets.top;
   const headerHeight = safeTop + 52;
@@ -258,7 +274,7 @@ export default function EventFilterScreen() {
             <Tabs
               items={DATE_FILTER_OPTIONS}
               activeKey={activeFilter}
-              onSelect={setActiveFilter}
+              onSelect={handleTabSelect}
               onTabLayout={(key, layout) => {
                 tabLayoutsRef.current[key] = layout;
               }}
@@ -269,42 +285,59 @@ export default function EventFilterScreen() {
         </View>
       </View>
 
-      <View key={activeFilter} className="flex-1" style={{ minHeight: swipeAreaMinHeight }} {...filterPanResponder.panHandlers}>
-        <FlatList
-          data={loading ? Array.from({ length: 6 }, (_, i) => ({ id: `skeleton-${i}`, _skeleton: true } as any)) : filteredEvents}
+      <View style={{ flex: 1, minHeight: swipeAreaMinHeight }} onLayout={handlePagerLayout}>
+        <ScrollView
+          ref={pagerRef}
+          horizontal
+          pagingEnabled
+          decelerationRate="fast"
+          showsHorizontalScrollIndicator={false}
+          onMomentumScrollEnd={handlePagerScrollEnd}
+          onScrollEndDrag={handlePagerScrollEnd}
+          scrollEventThrottle={16}
           style={{ flex: 1 }}
-          contentContainerStyle={{
-            paddingHorizontal: 0,
-            paddingBottom: bottomPadding,
-            flexGrow: 1,
-            minHeight: height - 140,
-          }}
-          keyExtractor={(item) => item.id}
-          numColumns={2}
-          columnWrapperStyle={{ gap: 2, marginBottom: 2 }}
-          renderItem={({ item }) => (
-            <View className="flex-1">
-              {item._skeleton ? <EventCardSkeleton /> : <EventCard event={item} />}
+          contentContainerStyle={{ flexGrow: 1 }}
+        >
+          {DATE_FILTER_OPTIONS.map(({ key: filterKey }) => (
+            <View key={filterKey} style={{ width: pagerWidth, flex: 1 }}>
+              <FlatList
+                data={listDataByFilter[filterKey]}
+                style={{ flex: 1 }}
+                contentContainerStyle={{
+                  paddingHorizontal: 2,
+                  paddingBottom: bottomPadding,
+                  flexGrow: 1,
+                  minHeight: height - 140,
+                }}
+                keyExtractor={(item) => item.id}
+                numColumns={2}
+                columnWrapperStyle={{ gap: 4, marginBottom: 4 }}
+                renderItem={({ item }) => (
+                  <View className="flex-1">
+                    {item._skeleton ? <EventCardSkeleton /> : <EventCard event={item} />}
+                  </View>
+                )}
+                refreshControl={
+                  <RefreshControl refreshing={refreshing} onRefresh={() => loadEvents(true)} tintColor="#DC2626" colors={['#DC2626']} />
+                }
+                ListHeaderComponent={
+                  <View className="mb-4 mt-2" style={{ paddingHorizontal: 2 }}>
+                    <Text className="text-gray-900 text-xl font-bold">{DATE_FILTER_HEADINGS[filterKey]}</Text>
+                  </View>
+                }
+                ListEmptyComponent={
+                  !loading ? (
+                    <View className="py-14 items-center justify-center" style={{ paddingHorizontal: 2 }}>
+                      <MaterialIcons name="event-busy" size={48} color="#4B5563" />
+                      <Text className="text-[#9CA3AF] text-base font-medium mt-3">No data found</Text>
+                      <Text className="text-[#6B7280] text-sm mt-1 text-center px-3">No events match this filter.</Text>
+                    </View>
+                  ) : null
+                }
+              />
             </View>
-          )}
-          refreshControl={
-            <RefreshControl refreshing={refreshing} onRefresh={() => loadEvents(true)} tintColor="#DC2626" colors={["#DC2626"]} />
-          }
-          ListHeaderComponent={
-            <View className="px-3 mb-4 mt-2">
-              <Text className="text-gray-900 text-xl font-bold">{DATE_FILTER_HEADINGS[activeFilter]}</Text>
-            </View>
-          }
-          ListEmptyComponent={
-            !loading ? (
-              <View className="px-3 py-14 items-center justify-center">
-                <MaterialIcons name="event-busy" size={48} color="#4B5563" />
-                <Text className="text-[#9CA3AF] text-base font-medium mt-3">No data found</Text>
-                <Text className="text-[#6B7280] text-sm mt-1 text-center px-3">No events match this filter.</Text>
-              </View>
-            ) : null
-          }
-        />
+          ))}
+        </ScrollView>
       </View>
     </View>
   );

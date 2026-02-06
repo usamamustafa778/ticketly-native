@@ -13,12 +13,14 @@ import { useAppStore } from '@/store/useAppStore';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useFocusEffect, useRouter } from 'expo-router';
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Animated,
   Dimensions,
   Image,
-  PanResponder,
+  LayoutChangeEvent,
+  NativeScrollEvent,
+  NativeSyntheticEvent,
   Platform,
   RefreshControl,
   ScrollView,
@@ -44,6 +46,9 @@ const FILTER_OPTIONS: { key: HomeFilter; label: string }[] = [
   { key: 'today', label: 'Today' },
   { key: 'upcoming', label: 'Upcoming' },
 ];
+
+// Pager tabs (only those with content on this page; Upcoming navigates away)
+const HOME_PAGER_ORDER: HomeFilter[] = ['explore', 'following', 'today'];
 
 function isSameDay(a: Date, b: Date): boolean {
   return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
@@ -149,37 +154,36 @@ export default function HomeScreen() {
   const tabLayoutsRef = useRef<Record<string, { x: number; width: number }>>({});
   const scrollX = useRef(new Animated.Value(0)).current;
   const animatedScales = useRef<Animated.Value[]>([]);
-  const activeFilterRef = useRef(activeFilter);
-  activeFilterRef.current = activeFilter;
+  const [pagerWidth, setPagerWidth] = useState(Dimensions.get('window').width);
+  const pagerRef = useRef<ScrollView>(null);
 
-  const filterPanResponder = useRef(
-    PanResponder.create({
-      onStartShouldSetPanResponder: () => false,
-      onStartShouldSetPanResponderCapture: () => false,
-      onMoveShouldSetPanResponder: (_, gestureState) => {
-        const { dx, dy } = gestureState;
-        return Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > 35;
-      },
-      onMoveShouldSetPanResponderCapture: (_, gestureState) => {
-        const { dx, dy } = gestureState;
-        return Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > 35;
-      },
-      onPanResponderTerminationRequest: () => false,
-      onPanResponderRelease: (_, gestureState) => {
-        const { dx } = gestureState;
-        const SWIPE_THRESHOLD = 40;
-        const currentFilter = activeFilterRef.current;
-        const idx = FILTER_OPTIONS.findIndex((f) => f.key === currentFilter);
-        if (dx < -SWIPE_THRESHOLD && idx < FILTER_OPTIONS.length - 1) {
-          const nextKey = FILTER_OPTIONS[idx + 1].key;
-          if (nextKey === 'upcoming') router.push('/event-filter');
-          else setActiveFilter(nextKey);
-        } else if (dx > SWIPE_THRESHOLD && idx > 0) {
-          setActiveFilter(FILTER_OPTIONS[idx - 1].key);
-        }
-      },
-    })
-  ).current;
+  const handleTabSelect = useCallback(
+    (key: HomeFilter) => {
+      if (key === 'upcoming') {
+        router.push('/event-filter');
+        return;
+      }
+      setActiveFilter(key);
+      const index = HOME_PAGER_ORDER.indexOf(key);
+      if (index >= 0) pagerRef.current?.scrollTo({ x: index * pagerWidth, animated: true });
+    },
+    [pagerWidth]
+  );
+
+  const handlePagerScrollEnd = useCallback(
+    (e: NativeSyntheticEvent<NativeScrollEvent>) => {
+      const x = e.nativeEvent.contentOffset.x;
+      const index = Math.round(x / pagerWidth);
+      const tab = HOME_PAGER_ORDER[Math.max(0, Math.min(index, HOME_PAGER_ORDER.length - 1))];
+      setActiveFilter(tab);
+    },
+    [pagerWidth]
+  );
+
+  const handlePagerLayout = useCallback((e: LayoutChangeEvent) => {
+    const w = e.nativeEvent.layout.width;
+    if (w > 0) setPagerWidth(w);
+  }, []);
 
   // Hydrate user from profile cache when home tab is focused so "My Events" can show createdEvents from localStorage
   useFocusEffect(
@@ -307,13 +311,19 @@ export default function HomeScreen() {
     return upcomingEvents.filter((event) => eventMatchesFilter(event, activeFilter, user?._id, joinedEventIds));
   }, [upcomingEvents, followingEvents, activeFilter, user?._id, joinedEventIds]);
 
-  // Masonry: assign each item a height from CARD_HEIGHTS (cycle so all 8 heights exist), then distribute by shortest column
+  // Per-tab event lists for pager (Explore, Following, Today)
+  const exploreEvents = useMemo(
+    () => upcomingEvents.filter((e) => eventMatchesFilter(e, 'explore', user?._id, joinedEventIds)),
+    [upcomingEvents, user?._id, joinedEventIds]
+  );
+  const todayEvents = useMemo(
+    () => upcomingEvents.filter((e) => eventMatchesFilter(e, 'today', user?._id, joinedEventIds)),
+    [upcomingEvents, user?._id, joinedEventIds]
+  );
+
+  // Masonry: assign each item a height from CARD_HEIGHTS (cycle), then distribute by shortest column
   type MasonrySlot = { item: any; height: number };
-  const masonryColumns = useMemo((): MasonrySlot[][] => {
-    const list = loading
-      ? Array.from({ length: 8 }, (_, i) => ({ id: `skeleton-${i}`, _skeleton: true } as any))
-      : filteredEvents;
-    // Cycle through all 8 heights so every height appears (item 0→175, 1→200, … 7→375, 8→175, …)
+  const buildMasonry = (list: any[]): MasonrySlot[][] => {
     const slots: MasonrySlot[] = list.map((item, index) => ({
       item,
       height: CARD_HEIGHTS[index % CARD_HEIGHTS.length],
@@ -326,7 +336,24 @@ export default function HomeScreen() {
       columnHeights[colIndex] += slot.height + MASONRY_GAP;
     });
     return columns;
-  }, [loading, filteredEvents]);
+  };
+
+  const skeletonList = useMemo(
+    () => Array.from({ length: 8 }, (_, i) => ({ id: `skeleton-${i}`, _skeleton: true } as any)),
+    []
+  );
+  const exploreColumns = useMemo(
+    () => buildMasonry(loading ? skeletonList : exploreEvents),
+    [loading, exploreEvents, skeletonList]
+  );
+  const followingColumns = useMemo(
+    () => buildMasonry(loading ? skeletonList : followingEvents),
+    [loading, followingEvents, skeletonList]
+  );
+  const todayColumns = useMemo(
+    () => buildMasonry(loading ? skeletonList : todayEvents),
+    [loading, todayEvents, skeletonList]
+  );
 
   const safeTop = insets.top + 12;
   const filterRowHeight = 36;
@@ -379,10 +406,7 @@ export default function HomeScreen() {
           <Tabs
             items={FILTER_OPTIONS}
             activeKey={activeFilter === 'upcoming' ? 'explore' : activeFilter}
-            onSelect={(key) => {
-              if (key === 'upcoming') router.push('/event-filter');
-              else setActiveFilter(key);
-            }}
+            onSelect={handleTabSelect}
             onTabLayout={(key, layout) => {
               tabLayoutsRef.current[key] = layout;
             }}
@@ -411,121 +435,134 @@ export default function HomeScreen() {
         </View>
       </View>
 
-      {/* Content: custom masonry grid (2 columns, no library) */}
-      <View key={activeFilter} className="flex-1" style={{ minHeight: swipeAreaMinHeight }} {...filterPanResponder.panHandlers}>
+      {/* Content: horizontal pager (Explore, Following, Today) – only tab content slides */}
+      <View style={{ flex: 1, minHeight: swipeAreaMinHeight }} onLayout={handlePagerLayout}>
         <ScrollView
+          ref={pagerRef}
+          horizontal
+          pagingEnabled
+          decelerationRate="fast"
+          showsHorizontalScrollIndicator={false}
+          onMomentumScrollEnd={handlePagerScrollEnd}
+          onScrollEndDrag={handlePagerScrollEnd}
+          scrollEventThrottle={16}
           style={{ flex: 1 }}
-          contentContainerStyle={{
-            paddingTop: headerHeight,
-            paddingHorizontal: MASONRY_PADDING_H,
-            paddingBottom: bottomPadding,
-            flexGrow: 1,
-            minHeight: height - 140,
-          }}
-          refreshControl={
-            <RefreshControl
-              refreshing={refreshing}
-              onRefresh={onRefresh}
-              tintColor="#DC2626"
-              colors={['#DC2626']}
-            />
-          }
-          showsVerticalScrollIndicator={false}
+          contentContainerStyle={{ flexGrow: 1 }}
         >
-          {filteredEvents.length === 0 && !loading ? (
-            <View className="px-3 py-14 items-center justify-center">
-              <MaterialIcons name="event-busy" size={48} color="#4B5563" />
-              <Text className="text-[#9CA3AF] text-base font-medium mt-3">No data found</Text>
-              <Text className="text-[#6B7280] text-sm mt-1 text-center px-3">
-                {activeFilter === 'following'
-                  ? "You’re not seeing any events from people you follow yet."
-                  : upcomingEvents.length === 0
-                    ? 'No events available yet.'
-                    : 'No events match this filter.'}
-              </Text>
-              {activeFilter === 'following' && (
-                <ButtonPrimary
-                  size="lg"
-                  className="mt-6"
-                  onPress={() => setActiveFilter('explore')}
-                >
-                  Explore events
-                </ButtonPrimary>
-              )}
-            </View>
-          ) : (
-            <View style={{ flexDirection: 'row' }}>
-              {masonryColumns.map((column, colIndex) => (
-                <View
-                  key={colIndex}
-                  style={{
-                    flex: 1,
-                    marginLeft: colIndex === 0 ? 0 : MASONRY_GAP,
-                  }}
-                >
-                  {column.map((slot) => (
-                    <View key={slot.item.id} style={{ marginBottom: MASONRY_GAP }}>
-                      {slot.item._skeleton ? (
-                        <EventCardSkeleton height={slot.height} />
-                      ) : (
-                        <EventCard event={slot.item} height={slot.height} />
-                      )}
-                    </View>
-                  ))}
-                </View>
-              ))}
-            </View>
-          )}
-
-          {/* Suggested hosts: always show in Following tab (whether or not there are events) */}
-          {activeFilter === 'following' && suggestedAccounts.length > 0 && (
-            <View className="w-full mt-8 px-1 pb-6">
-              <Text className="text-gray-900 text-base font-semibold mb-3">
-                Suggested hosts for you
-              </Text>
-              {suggestedAccounts.map((account) => {
-                const accountId = account._id || account.id;
-                const canNavigate = Boolean(accountId);
-                const handlePress = () => {
-                  if (!canNavigate) return;
-                  // Open profile inside tabs and remember origin (following tab on home)
-                  router.push(`/(tabs)/user/${accountId}?comeFrom=${encodeURIComponent(activeFilter)}`);
-                };
-                return (
-                  <TouchableOpacity
-                    key={account._id}
-                    className="flex-row items-center py-2 border-b border-gray-100"
-                    activeOpacity={0.8}
-                    onPress={handlePress}
-                    disabled={!canNavigate}
-                  >
-                    <View className="w-10 h-10 rounded-full bg-primary items-center justify-center overflow-hidden mr-3">
-                      <Image
-                        source={{
-                          uri:
-                            getProfileImageUrl({ profileImageUrl: account.profileImageUrl }) ||
-                            'https://images.unsplash.com/photo-1494797710133-75adf6c1f4a3?w=200',
+          {HOME_PAGER_ORDER.map((filterKey) => (
+            <View key={filterKey} style={{ width: pagerWidth, flex: 1 }}>
+              <ScrollView
+                style={{ flex: 1 }}
+                contentContainerStyle={{
+                  paddingTop: headerHeight,
+                  paddingHorizontal: MASONRY_PADDING_H,
+                  paddingBottom: bottomPadding,
+                  flexGrow: 1,
+                  minHeight: height - 140,
+                }}
+                refreshControl={
+                  <RefreshControl
+                    refreshing={refreshing}
+                    onRefresh={onRefresh}
+                    tintColor="#DC2626"
+                    colors={['#DC2626']}
+                  />
+                }
+                showsVerticalScrollIndicator={false}
+              >
+                {filterKey === 'explore' && (exploreEvents.length === 0 && !loading) ? (
+                  <View className="px-3 py-14 items-center justify-center">
+                    <MaterialIcons name="event-busy" size={48} color="#4B5563" />
+                    <Text className="text-[#9CA3AF] text-base font-medium mt-3">No data found</Text>
+                    <Text className="text-[#6B7280] text-sm mt-1 text-center px-3">
+                      {upcomingEvents.length === 0 ? 'No events available yet.' : 'No events match this filter.'}
+                    </Text>
+                  </View>
+                ) : filterKey === 'following' && (followingEvents.length === 0 && !loading) ? (
+                  <View className="px-3 py-14 items-center justify-center">
+                    <MaterialIcons name="event-busy" size={48} color="#4B5563" />
+                    <Text className="text-[#9CA3AF] text-base font-medium mt-3">No data found</Text>
+                    <Text className="text-[#6B7280] text-sm mt-1 text-center px-3">
+                      You're not seeing any events from people you follow yet.
+                    </Text>
+                    <ButtonPrimary size="lg" className="mt-6" onPress={() => handleTabSelect('explore')}>
+                      Explore events
+                    </ButtonPrimary>
+                  </View>
+                ) : filterKey === 'today' && (todayEvents.length === 0 && !loading) ? (
+                  <View className="px-3 py-14 items-center justify-center">
+                    <MaterialIcons name="event-busy" size={48} color="#4B5563" />
+                    <Text className="text-[#9CA3AF] text-base font-medium mt-3">No data found</Text>
+                    <Text className="text-[#6B7280] text-sm mt-1 text-center px-3">No events match this filter.</Text>
+                  </View>
+                ) : (
+                  <View style={{ flexDirection: 'row' }}>
+                    {(filterKey === 'explore' ? exploreColumns : filterKey === 'following' ? followingColumns : todayColumns).map((column, colIndex) => (
+                      <View
+                        key={colIndex}
+                        style={{
+                          flex: 1,
+                          marginLeft: colIndex === 0 ? 0 : MASONRY_GAP,
                         }}
-                        className="w-full h-full"
-                        resizeMode="cover"
-                      />
-                    </View>
-                    <View className="flex-1">
-                      <Text className="text-gray-900 font-medium" numberOfLines={1}>
-                        {account.fullName || 'User'}
-                      </Text>
-                      <Text className="text-gray-500 text-xs" numberOfLines={1}>
-                        {account.reasonLabel}
-                      </Text>
-                    </View>
-                    <MaterialIcons name="chevron-right" size={20} color="#9CA3AF" />
-                  </TouchableOpacity>
-                );
-              })}
+                      >
+                        {column.map((slot) => (
+                          <View key={slot.item.id} style={{ marginBottom: MASONRY_GAP }}>
+                            {slot.item._skeleton ? (
+                              <EventCardSkeleton height={slot.height} />
+                            ) : (
+                              <EventCard event={slot.item} height={slot.height} />
+                            )}
+                          </View>
+                        ))}
+                      </View>
+                    ))}
+                  </View>
+                )}
+                {filterKey === 'following' && suggestedAccounts.length > 0 && (
+                  <View className="w-full mt-8 px-1 pb-6">
+                    <Text className="text-gray-900 text-base font-semibold mb-3">Suggested hosts for you</Text>
+                    {suggestedAccounts.map((account) => {
+                      const accountId = account._id || account.id;
+                      const canNavigate = Boolean(accountId);
+                      return (
+                        <TouchableOpacity
+                          key={account._id}
+                          className="flex-row items-center py-2 border-b border-gray-100"
+                          activeOpacity={0.8}
+                          onPress={() => canNavigate && router.push(`/user/${accountId}?comeFrom=following`)}
+                          disabled={!canNavigate}
+                        >
+                          <View className="w-10 h-10 rounded-full bg-primary items-center justify-center overflow-hidden mr-3">
+                            <Image
+                              source={{
+                                uri:
+                                  getProfileImageUrl({ profileImageUrl: account.profileImageUrl }) ||
+                                  'https://images.unsplash.com/photo-1494797710133-75adf6c1f4a3?w=200',
+                              }}
+                              className="w-full h-full"
+                              resizeMode="cover"
+                            />
+                          </View>
+                          <View className="flex-1">
+                            <Text className="text-gray-900 font-medium" numberOfLines={1}>
+                              {account.fullName || 'User'}
+                            </Text>
+                            <Text className="text-gray-500 text-xs" numberOfLines={1}>
+                              {account.reasonLabel}
+                            </Text>
+                          </View>
+                          <MaterialIcons name="chevron-right" size={20} color="#9CA3AF" />
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </View>
+                )}
+              </ScrollView>
             </View>
-          )}
+          ))}
         </ScrollView>
       </View>
+
 
       <Modal
         visible={showErrorModal}

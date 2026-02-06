@@ -1,39 +1,39 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
-import {
-  View,
-  Text,
-  ScrollView,
-  TouchableOpacity,
-  Image,
-  ActivityIndicator,
-  TextInput,
-  RefreshControl,
-  Modal as RNModal,
-  Pressable,
-  Animated,
-  Dimensions,
-  Platform,
-} from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useRouter, useLocalSearchParams } from 'expo-router';
-import { useAppStore } from '@/store/useAppStore';
-import { eventsAPI, type Event } from '@/lib/api/events';
-import { ticketsAPI, type GetMyTicketsResponse } from '@/lib/api/tickets';
-import { authAPI } from '@/lib/api/auth';
-import { CACHE_KEYS, getCached, setCached } from '@/lib/cache';
-import { Modal } from '@/components/Modal';
 import { BackButton } from '@/components/BackButton';
 import { EventDetailsSkeleton } from '@/components/EventDetailsSkeleton';
+import { Modal } from '@/components/Modal';
+import { authAPI } from '@/lib/api/auth';
+import { eventsAPI, type Event } from '@/lib/api/events';
+import { ticketsAPI, type GetMyTicketsResponse } from '@/lib/api/tickets';
+import { CACHE_KEYS, getCached, setCached } from '@/lib/cache';
+import { getEventImageUrl, getProfileImageUrl } from '@/lib/utils/imageUtils';
+import { useAppStore } from '@/store/useAppStore';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
+import { useLocalSearchParams, useRouter } from 'expo-router';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import {
+    ActivityIndicator,
+    Animated,
+    Dimensions,
+    Image,
+    Platform,
+    Pressable,
+    RefreshControl,
+    Modal as RNModal,
+    ScrollView,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View,
+} from 'react-native';
 import AnimatedReanimated, {
-  useSharedValue,
-  useAnimatedStyle,
-  withRepeat,
-  withSequence,
-  withTiming,
-  cancelAnimation,
+    cancelAnimation,
+    useAnimatedStyle,
+    useSharedValue,
+    withRepeat,
+    withSequence,
+    withTiming,
 } from 'react-native-reanimated';
-import { getEventImageUrl } from '@/lib/utils/imageUtils';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 export default function EventDetailsScreen() {
   const router = useRouter();
@@ -467,8 +467,8 @@ export default function EventDetailsScreen() {
           />
         </TouchableOpacity>
 
-        {/* Event Info Card - Compact */}
-        <View className="bg-white rounded-t-3xl px-3 py-2.5 -mt-5 border-t border-gray-200 overflow-hidden">
+        {/* Event Info Card */}
+        <View className="bg-white rounded-t-3xl px-4 pt-4 pb-5 -mt-5 border-t border-gray-200 overflow-hidden">
           {/* Loading line animation when fetching in background */}
           {sBackgroundFetching && (
             <View style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 2, backgroundColor: '#E5E7EB', zIndex: 1, overflow: 'hidden' }}>
@@ -488,30 +488,32 @@ export default function EventDetailsScreen() {
               />
             </View>
           )}
-          <View className="flex-row justify-between items-center mb-3">
-            <Text className="text-gray-900 text-lg font-bold flex-1 mr-2">{event.title}</Text>
+          <View className="flex-row justify-between items-start mb-4">
+            <Text className="text-gray-900 text-xl font-bold flex-1 mr-3 leading-tight" numberOfLines={3}>
+              {event.title}
+            </Text>
             <TouchableOpacity
-              className="flex-row items-center gap-1 bg-gray-100 py-1 px-2 rounded-lg"
+              className="flex-row items-center gap-1.5 bg-gray-100 py-2 px-2.5 rounded-lg flex-shrink-0"
               onPress={handleLike}
               activeOpacity={0.7}
             >
               <Animated.View style={{ transform: [{ scale: likeScale }] }}>
                 <MaterialIcons
                   name={isLiked ? "favorite" : "favorite-border"}
-                  size={16}
+                  size={18}
                   color={isLiked ? "#EF4444" : "#9CA3AF"}
                 />
               </Animated.View>
-              <Text className="text-gray-700 text-xs font-semibold">{likeCount}</Text>
+              <Text className="text-gray-700 text-sm font-semibold">{likeCount}</Text>
             </TouchableOpacity>
           </View>
 
           {/* Event Date & Time */}
-          <View className="flex-row mb-2 items-start">
-            <MaterialIcons name="calendar-today" size={16} color="#6B7280" style={{ marginRight: 8, marginTop: 1 }} />
-            <View className="flex-1">
-              <Text className="text-gray-900 text-xs font-semibold mb-0.5">Event Date & Time</Text>
-              <Text className="text-gray-700 text-xs">
+          <View className="flex-row mb-3 items-start">
+            <MaterialIcons name="calendar-today" size={18} color="#6B7280" style={{ marginRight: 10, marginTop: 2 }} />
+            <View className="flex-1 min-w-0">
+              <Text className="text-gray-500 text-xs font-medium mb-0.5">Date & time</Text>
+              <Text className="text-gray-900 text-sm">
                 {formatDate(event.date)}, {formatTime(event.time)}
               </Text>
             </View>
@@ -519,32 +521,32 @@ export default function EventDetailsScreen() {
 
           {/* Location (optional) */}
           {event.location ? (
-            <View className="flex-row mb-2 items-start">
-              <MaterialIcons name="location-on" size={16} color="#6B7280" style={{ marginRight: 8, marginTop: 1 }} />
-              <View className="flex-1">
-                <Text className="text-gray-900 text-xs font-semibold mb-0.5">Location</Text>
-                <Text className="text-gray-700 text-xs">{event.location}</Text>
+            <View className="flex-row mb-3 items-start">
+              <MaterialIcons name="location-on" size={18} color="#6B7280" style={{ marginRight: 10, marginTop: 2 }} />
+              <View className="flex-1 min-w-0">
+                <Text className="text-gray-500 text-xs font-medium mb-0.5">Location</Text>
+                <Text className="text-gray-900 text-sm">{event.location}</Text>
               </View>
             </View>
           ) : null}
 
           {/* Gender (optional) */}
           {event.gender ? (
-            <View className="flex-row mb-2 items-start">
-              <MaterialIcons name="person-outline" size={16} color="#6B7280" style={{ marginRight: 8, marginTop: 1 }} />
-              <View className="flex-1">
-                <Text className="text-gray-900 text-xs font-semibold mb-0.5">Gender</Text>
-                <Text className="text-gray-700 text-xs capitalize">{event.gender}</Text>
+            <View className="flex-row mb-3 items-start">
+              <MaterialIcons name="person-outline" size={18} color="#6B7280" style={{ marginRight: 10, marginTop: 2 }} />
+              <View className="flex-1 min-w-0">
+                <Text className="text-gray-500 text-xs font-medium mb-0.5">Gender</Text>
+                <Text className="text-gray-900 text-sm capitalize">{event.gender}</Text>
               </View>
             </View>
           ) : null}
 
-          {/* Price: event.price { price, currency } or free; fallback ticketPrice */}
-          <View className="flex-row mb-2 items-start">
-            <MaterialIcons name="confirmation-number" size={16} color="#6B7280" style={{ marginRight: 8, marginTop: 1 }} />
-            <View className="flex-1">
-              <Text className="text-gray-900 text-xs font-semibold mb-0.5">Ticket Price</Text>
-              <Text className="text-gray-700 text-xs">
+          {/* Ticket Price */}
+          <View className="flex-row mb-3 items-start">
+            <MaterialIcons name="confirmation-number" size={18} color="#6B7280" style={{ marginRight: 10, marginTop: 2 }} />
+            <View className="flex-1 min-w-0">
+              <Text className="text-gray-500 text-xs font-medium mb-0.5">Ticket price</Text>
+              <Text className="text-gray-900 text-sm">
                 {event.price?.price === 'free' || event.price?.currency === null
                   ? 'Free'
                   : event.price?.currency
@@ -554,7 +556,7 @@ export default function EventDetailsScreen() {
                       : 'Free'}
               </Text>
               {event.totalTickets != null && event.totalTickets > 0 && (
-                <Text className="text-gray-600 text-[10px] mt-0.5">
+                <Text className="text-gray-500 text-xs mt-1">
                   {event.totalTickets} tickets available
                 </Text>
               )}
@@ -562,31 +564,28 @@ export default function EventDetailsScreen() {
           </View>
 
           {/* Register / Get More Tickets Button */}
-          {!isRegistered && 
-          (  <TouchableOpacity
-            className="py-2.5 rounded-lg items-center mt-2 bg-primary"
-            onPress={handleRegister}
-            disabled={creatingTicket}
-          >
-            {creatingTicket ? (
-              <ActivityIndicator size="small" color="#FFFFFF" />
-            ) : (
-              <Text className="text-white text-xs font-bold">
-                {isRegistered ? 'Get More Tickets' : 'Register Now'}
-              </Text>
-            )}
-          </TouchableOpacity>
-          )
-          }
-         
-
+          {!isRegistered && (
+            <TouchableOpacity
+              className="py-3 rounded-xl items-center mt-1 bg-primary"
+              onPress={handleRegister}
+              disabled={creatingTicket}
+            >
+              {creatingTicket ? (
+                <ActivityIndicator size="small" color="#FFFFFF" />
+              ) : (
+                <Text className="text-white text-sm font-semibold">
+                  Register now
+                </Text>
+              )}
+            </TouchableOpacity>
+          )}
         </View>
 
-        {/* Event Description Section (optional) */}
+        {/* Event Description */}
         {event.description ? (
-          <View className="px-3 py-2 border-t border-gray-200 bg-white">
-            <Text className="text-gray-900 text-sm font-bold mb-1.5">Event Description</Text>
-            <Text className="text-gray-700 text-xs leading-5">
+          <View className="px-4 py-4 border-t border-gray-100 bg-white">
+            <Text className="text-gray-900 text-base font-bold mb-2">About this event</Text>
+            <Text className="text-gray-700 text-sm leading-6">
               {event.description}
             </Text>
           </View>
@@ -594,35 +593,35 @@ export default function EventDetailsScreen() {
 
         {/* Contact Information */}
         {(event.email || event.phone) && (
-          <View className="px-3 py-2 border-t border-gray-200 bg-white">
-            <Text className="text-gray-900 text-sm font-bold mb-1.5">Contact Information</Text>
+          <View className="px-4 py-4 border-t border-gray-100 bg-white">
+            <Text className="text-gray-900 text-base font-bold mb-3">Contact</Text>
             {event.email && (
-              <View className="flex-row items-center mb-1">
-                <MaterialIcons name="email" size={14} color="#6B7280" style={{ marginRight: 8 }} />
-                <Text className="text-gray-700 text-xs">{event.email}</Text>
+              <View className="flex-row items-center mb-2">
+                <MaterialIcons name="email" size={18} color="#6B7280" style={{ marginRight: 10 }} />
+                <Text className="text-gray-900 text-sm flex-1">{event.email}</Text>
               </View>
             )}
             {event.phone && (
               <View className="flex-row items-center">
-                <MaterialIcons name="phone" size={14} color="#6B7280" style={{ marginRight: 8 }} />
-                <Text className="text-gray-700 text-xs">{event.phone}</Text>
+                <MaterialIcons name="phone" size={18} color="#6B7280" style={{ marginRight: 10 }} />
+                <Text className="text-gray-900 text-sm flex-1">{event.phone}</Text>
               </View>
             )}
           </View>
         )}
 
-        {/* Organized By: createdBy or organizerName */}
+        {/* Organized By */}
         {(event.createdBy || event.organizerName) && (
-          <View className="px-3 py-2 border-t border-gray-200 bg-white">
-            <Text className="text-gray-900 text-sm font-bold mb-1.5">Organized By</Text>
+          <View className="px-4 py-4 border-t border-gray-100 bg-white">
+            <Text className="text-gray-900 text-base font-bold mb-3">Organized by</Text>
             <TouchableOpacity
+              className="flex-row items-center"
               onPress={() => {
                 const organizerId = (event.createdBy as any)?._id || (event as any).organizerId;
                 if (organizerId) {
-                  // Preserve origin when navigating from event → organizer profile
                   const origin = (returnTo || '').toString();
                   if (origin) {
-                    router.push(`/(tabs)/user/${organizerId}?comeFrom=${encodeURIComponent(origin)}`);
+                    router.push(`/user/${organizerId}?comeFrom=${encodeURIComponent(origin)}`);
                   } else {
                     router.push(`/user/${organizerId}`);
                   }
@@ -631,29 +630,44 @@ export default function EventDetailsScreen() {
               activeOpacity={0.7}
               disabled={!((event.createdBy as any)?._id || (event as any).organizerId)}
             >
-              <Text className="text-gray-800 text-xs font-semibold text-primary">
-                {event.createdBy?.fullName ?? event.organizerName ?? '—'}
-              </Text>
+              <View className="w-12 h-12 rounded-full bg-primary overflow-hidden mr-3 items-center justify-center">
+                {getProfileImageUrl(event.createdBy as any) ? (
+                  <Image
+                    source={{ uri: getProfileImageUrl(event.createdBy as any) || '' }}
+                    className="w-full h-full"
+                    resizeMode="cover"
+                  />
+                ) : (
+                  <Text className="text-white text-lg font-bold">
+                    {(event.createdBy?.fullName ?? event.organizerName ?? '?').charAt(0).toUpperCase()}
+                  </Text>
+                )}
+              </View>
+              <View className="flex-1 min-w-0">
+                <Text className="text-primary text-sm font-semibold">
+                  {event.createdBy?.fullName ?? event.organizerName ?? '—'}
+                </Text>
+                {(event.createdBy?.email || (event.email && !event.createdBy?.email)) && (
+                  <Text className="text-gray-500 text-xs mt-0.5">
+                    {event.createdBy?.email ?? event.email}
+                  </Text>
+                )}
+              </View>
+              <MaterialIcons name="chevron-right" size={20} color="#9CA3AF" />
             </TouchableOpacity>
-            {event.createdBy?.email && (
-              <Text className="text-gray-600 text-[10px] mt-0.5">{event.createdBy.email}</Text>
-            )}
-            {event.email && !event.createdBy?.email && (
-              <Text className="text-gray-600 text-[10px] mt-0.5">{event.email}</Text>
-            )}
           </View>
         )}
 
         {/* User's Tickets Section */}
         {user && userTickets.length > 0 && (
           <View
-            className="px-3 py-2 border-t border-gray-200 bg-white"
-            onLayout={(event) => {
-              const { y } = event.nativeEvent.layout;
+            className="px-4 py-4 border-t border-gray-100 bg-white"
+            onLayout={(e) => {
+              const { y } = e.nativeEvent.layout;
               setTicketsSectionY(y);
             }}
           >
-            <Text className="text-gray-900 text-sm font-bold mb-2">Your Tickets ({userTickets.length})</Text>
+            <Text className="text-gray-900 text-base font-bold mb-3">Your tickets ({userTickets.length})</Text>
             {userTickets.map((ticket: any, ticketIndex: number) => {
               // Determine if this ticket is for a free event
               const isFreeEventForTicket =
@@ -741,64 +755,57 @@ export default function EventDetailsScreen() {
               return (
                 <TouchableOpacity
                   key={ticketId}
-                  className={`${statusInfo.bgColor} ${statusInfo.borderColor} rounded-lg p-2.5 mb-2 border`}
+                  className={`${statusInfo.bgColor} ${statusInfo.borderColor} rounded-xl p-3 mb-3 border`}
                   onPress={() => router.push(`/ticket/${ticketId}`)}
                   activeOpacity={0.7}
                 >
                   <View className="flex-row items-start justify-between">
                     <View className="flex-1 mr-2 min-w-0">
-                      {/* Ticket Header with Status */}
                       <View className="flex-row items-center justify-between mb-2">
                         <View className="flex-row items-center flex-1 min-w-0">
                           <MaterialIcons
                             name={statusInfo.icon as any}
-                            size={16}
+                            size={18}
                             color={statusInfo.iconColor}
-                            style={{ marginRight: 6 }}
+                            style={{ marginRight: 8 }}
                           />
-                          <Text className="text-gray-900 text-xs font-bold" numberOfLines={1}>
+                          <Text className="text-gray-900 text-sm font-bold" numberOfLines={1}>
                             Ticket #{ticketId.slice(-8).toUpperCase()}
                           </Text>
                         </View>
-                        <View className={`${statusInfo.badgeColor} px-2 py-0.5 rounded-full ml-1`}>
-                          <Text className="text-white text-[9px] font-bold uppercase">
+                        <View className={`${statusInfo.badgeColor} px-2 py-1 rounded-full ml-2`}>
+                          <Text className="text-white text-[10px] font-bold uppercase">
                             {statusInfo.label}
                           </Text>
                         </View>
                       </View>
-
-                      {/* Ticket Details */}
                       <View>
-                        <View className="flex-row items-center mb-1">
-                          <MaterialIcons name="email" size={12} color="#6B7280" style={{ marginRight: 6 }} />
-                          <Text className="text-gray-700 text-[10px] flex-1" numberOfLines={1}>
+                        <View className="flex-row items-center mb-1.5">
+                          <MaterialIcons name="email" size={14} color="#6B7280" style={{ marginRight: 8 }} />
+                          <Text className="text-gray-700 text-xs flex-1" numberOfLines={1}>
                             {ticket.email}
                           </Text>
                         </View>
-                        <View className="flex-row items-center mb-1">
-                          <MaterialIcons name="phone" size={12} color="#6B7280" style={{ marginRight: 6 }} />
-                          <Text className="text-gray-700 text-[10px]">
-                            {ticket.phone}
-                          </Text>
+                        <View className="flex-row items-center mb-1.5">
+                          <MaterialIcons name="phone" size={14} color="#6B7280" style={{ marginRight: 8 }} />
+                          <Text className="text-gray-700 text-xs">{ticket.phone}</Text>
                         </View>
                         {ticket.createdAt && (
                           <View className="flex-row items-center">
-                            <MaterialIcons name="calendar-today" size={12} color="#6B7280" style={{ marginRight: 6 }} />
-                            <Text className="text-gray-600 text-[9px]">
+                            <MaterialIcons name="calendar-today" size={14} color="#6B7280" style={{ marginRight: 8 }} />
+                            <Text className="text-gray-500 text-xs">
                               {new Date(ticket.createdAt).toLocaleDateString('en-US', {
                                 month: 'short',
                                 day: 'numeric',
-                                year: 'numeric'
+                                year: 'numeric',
                               })}
                             </Text>
                           </View>
                         )}
                       </View>
                     </View>
-
-                    {/* Arrow Icon */}
-                    <View className="justify-center">
-                      <MaterialIcons name="chevron-right" size={18} color="#6B7280" />
+                    <View className="justify-center pt-1">
+                      <MaterialIcons name="chevron-right" size={20} color="#6B7280" />
                     </View>
                   </View>
                 </TouchableOpacity>

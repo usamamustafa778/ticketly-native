@@ -1,36 +1,36 @@
 import { EventCard } from '@/components/EventCard';
 import { EventCardSkeleton } from '@/components/EventCardSkeleton';
+import { Modal } from '@/components/Modal';
 import { UserProfileSkeleton } from '@/components/UserProfileSkeleton';
 import { ButtonPrimary } from '@/components/ui/ButtonPrimary';
 import { TabsRow } from '@/components/ui/Tabs';
+import { useBottomPadding } from '@/hooks/useBottomPadding';
 import { authAPI, PROFILE_CACHE_KEY, type PublicUserSummary } from '@/lib/api/auth';
 import { eventsAPI } from '@/lib/api/events';
-import { API_BASE_URL } from '@/lib/config';
+import { getEventImageUrl, getProfileImageUrl } from '@/lib/utils/imageUtils';
 import { useAppStore } from '@/store/useAppStore';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as ImagePicker from 'expo-image-picker';
 import { useFocusEffect, useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { getEventImageUrl, getProfileImageUrl } from '@/lib/utils/imageUtils';
 import {
   ActivityIndicator,
   Dimensions,
   FlatList,
   Image,
-  Modal as RNModal,
-  PanResponder,
-  Platform,
+  LayoutChangeEvent,
+  NativeScrollEvent,
+  NativeSyntheticEvent,
   Pressable,
   RefreshControl,
+  Modal as RNModal,
   ScrollView,
   Text,
   TouchableOpacity,
-  View,
+  View
 } from 'react-native';
-import { Modal } from '@/components/Modal';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useBottomPadding } from '@/hooks/useBottomPadding';
 
 // Token storage keys (must match client.ts)
 const ACCESS_TOKEN_KEY = 'accessToken';
@@ -108,36 +108,8 @@ export default function ProfileScreen() {
   const bottomPadding = useBottomPadding();
 
   const TAB_ORDER: ('created' | 'joined' | 'liked')[] = ['created', 'joined', 'liked'];
-  const activeTabRef = useRef(activeTab);
-  activeTabRef.current = activeTab;
-
-  const panResponder = useRef(
-    PanResponder.create({
-      onStartShouldSetPanResponder: () => false,
-      onStartShouldSetPanResponderCapture: () => false,
-      onMoveShouldSetPanResponder: (_, gestureState) => {
-        const { dx, dy } = gestureState;
-        return Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > 35;
-      },
-      onMoveShouldSetPanResponderCapture: (_, gestureState) => {
-        const { dx, dy } = gestureState;
-        return Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > 35;
-      },
-      onPanResponderTerminationRequest: () => false,
-      onPanResponderRelease: (_, gestureState) => {
-        const { dx } = gestureState;
-        const SWIPE_THRESHOLD = 40;
-        const currentTab = activeTabRef.current;
-        if (dx < -SWIPE_THRESHOLD) {
-          const idx = TAB_ORDER.indexOf(currentTab);
-          if (idx < TAB_ORDER.length - 1) setActiveTab(TAB_ORDER[idx + 1]);
-        } else if (dx > SWIPE_THRESHOLD) {
-          const idx = TAB_ORDER.indexOf(currentTab);
-          if (idx > 0) setActiveTab(TAB_ORDER[idx - 1]);
-        }
-      },
-    })
-  ).current;
+  const [pagerWidth, setPagerWidth] = useState(Dimensions.get('window').width);
+  const pagerRef = useRef<ScrollView>(null);
 
   // Use shared getProfileImageUrl (supports both profileImage and profileImageUrl)
   const profileImageUrl = user ? getProfileImageUrl(user) : null;
@@ -470,30 +442,50 @@ export default function ProfileScreen() {
   // Use myEvents directly as created events (they're already filtered by the API)
   const createdEvents = myEvents;
 
-  // FlatList data: loading skeletons or events based on activeTab (must be before early returns - hooks rule)
-  const profileFlatListData = React.useMemo(() => {
-    if (loading) {
-      return Array.from({ length: 6 }, (_, i) => ({ id: `skeleton-${i}`, _skeleton: true } as any));
-    }
-    if (activeTab === 'joined') {
-      return joinedEventsData.map((jd, idx) => {
-        const ev = convertEvent(jd.event);
-        return { ...ev, id: ev.id || `event-${idx}`, _tab: 'joined' as const };
-      });
-    }
-    if (activeTab === 'created') {
-      return createdEvents.map((e) => ({
-        ...e,
-        id: e.id || e._id || (e as any)?._id || (e as any)?.id,
-        _tab: 'created' as const,
-      }));
-    }
+  // Separate data for each tab (for horizontal pager – each page has its own list)
+  const createdListData = React.useMemo(() => {
+    if (loading) return Array.from({ length: 6 }, (_, i) => ({ id: `skeleton-created-${i}`, _skeleton: true } as any));
+    return createdEvents.map((e) => ({
+      ...e,
+      id: e.id || e._id || (e as any)?._id || (e as any)?.id,
+      _tab: 'created' as const,
+    }));
+  }, [loading, createdEvents]);
+
+  const joinedListData = React.useMemo(() => {
+    if (loading) return Array.from({ length: 6 }, (_, i) => ({ id: `skeleton-joined-${i}`, _skeleton: true } as any));
+    return joinedEventsData.map((jd, idx) => {
+      const ev = convertEvent(jd.event);
+      return { ...ev, id: ev.id || `event-${idx}`, _tab: 'joined' as const };
+    });
+  }, [loading, joinedEventsData]);
+
+  const likedListData = React.useMemo(() => {
+    if (loading) return Array.from({ length: 6 }, (_, i) => ({ id: `skeleton-liked-${i}`, _skeleton: true } as any));
     return likedEvents.map((e) => ({
       ...e,
       id: e.id || e._id || (e as any)?._id || (e as any)?.id,
       _tab: 'liked' as const,
     }));
-  }, [loading, activeTab, joinedEventsData, createdEvents, likedEvents]);
+  }, [loading, likedEvents]);
+
+  const handleTabSelect = useCallback((key: 'created' | 'joined' | 'liked') => {
+    setActiveTab(key);
+    const index = TAB_ORDER.indexOf(key);
+    pagerRef.current?.scrollTo({ x: index * pagerWidth, animated: true });
+  }, [pagerWidth]);
+
+  const handlePagerScrollEnd = useCallback((e: NativeSyntheticEvent<NativeScrollEvent>) => {
+    const x = e.nativeEvent.contentOffset.x;
+    const index = Math.round(x / pagerWidth);
+    const tab = TAB_ORDER[Math.max(0, Math.min(index, TAB_ORDER.length - 1))];
+    setActiveTab(tab);
+  }, [pagerWidth]);
+
+  const handlePagerLayout = useCallback((e: LayoutChangeEvent) => {
+    const w = e.nativeEvent.layout.width;
+    if (w > 0) setPagerWidth(w);
+  }, []);
 
   // Show loading only while we check cache (so we don't flash "Login" when user is actually logged in)
   if (!user && !hasCheckedCache) {
@@ -663,29 +655,10 @@ export default function ProfileScreen() {
     );
   };
 
-  return (
-    <View className="flex-1 bg-white" {...panResponder.panHandlers}>
-      <FlatList
-        key={activeTab}
-        data={profileFlatListData}
-        style={{ flex: 1 }}
-        contentContainerStyle={{ paddingTop: 0, paddingBottom: bottomPadding, paddingHorizontal: 2 }}
-        keyExtractor={(item) => item.id}
-        numColumns={2}
-        columnWrapperStyle={{ gap: 4, marginBottom: 4 }}
-        renderItem={renderProfileEventCard}
-        refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={onRefresh}
-            tintColor="#DC2626"
-            colors={["#DC2626"]}
-          />
-        }
-        ListHeaderComponent={
-          <>
-            {/* Banner / Cover (same as user page) */}
-            <View className="w-full overflow-hidden" style={{ height: 160 }}>
+  const profileFixedHeader = (
+    <>
+      {/* Banner / Cover (same as user page) */}
+      <View className="w-full overflow-hidden" style={{ height: 160 }}>
               {/* Cover image background */}
               {coverImageUrl ? (
                 <Image
@@ -839,7 +812,7 @@ export default function ProfileScreen() {
                   <TouchableOpacity
                     className="flex-1 flex-row items-center justify-center gap-2 py-2.5 rounded-full bg-gray-200"
                     activeOpacity={0.8}
-                    onPress={() => router.push('/settings')}
+                    onPress={() => router.push('/settings?open=profile')}
                   >
                     <MaterialIcons name="edit" size={20} color="#374151" />
                     <Text className="font-semibold text-sm text-gray-700">Edit profile</Text>
@@ -847,55 +820,116 @@ export default function ProfileScreen() {
                 </View>
               </View>
 
-              {/* Tabs */}
-              <View className="mx-4 mt-5 mb-2">
-                <TabsRow
-                  items={[
-                    { key: 'created', label: 'Created Events' },
-                    { key: 'joined', label: 'Joined Events' },
-                    { key: 'liked', label: 'Liked Events' },
-                  ]}
-                  activeKey={activeTab}
-                  onSelect={setActiveTab}
-                />
-              </View>
-            </View>
-          </>
-        }
-        ListEmptyComponent={
-          !loading ? (
-            <TouchableOpacity
-              className="px-3 py-10  items-center"
-              onPress={onRefresh}
-              activeOpacity={0.7}
-            >
-              <Text className="text-[#6B7280] text-sm">
-                {activeTab === 'joined'
-                  ? 'No events joined yet'
-                  : activeTab === 'created'
-                    ? 'No events created yet'
-                    : 'No events liked yet'}
-              </Text>
-            </TouchableOpacity>
-          ) : null
-        }
-        ListFooterComponent={
-          activeTab === 'liked' ? (
-            <View className="flex-row items-center justify-center gap-2 px-4 py-6">
-              <Text className="text-[#6B7280] text-sm text-center flex-1">
-                Choose who can see your liked events on your public profile
-              </Text>
-              <TouchableOpacity
-                onPress={() => router.push('/settings?open=liked')}
-                activeOpacity={0.7}
-                className="w-8 h-8 rounded-full bg-gray-100 items-center justify-center"
-              >
-                <MaterialIcons name="edit" size={18} color="#DC2626" />
-              </TouchableOpacity>
-            </View>
-          ) : null
-        }
+      {/* Tabs */}
+      <View className="mx-4 mt-5 mb-2">
+        <TabsRow
+          items={[
+            { key: 'created', label: 'Created Events' },
+            { key: 'joined', label: 'Joined Events' },
+            { key: 'liked', label: 'Liked Events' },
+          ]}
+          activeKey={activeTab}
+          onSelect={handleTabSelect}
+        />
+      </View>
+    </View>
+    </>
+  );
+
+  const emptyCreated = !loading ? (
+    <TouchableOpacity className="px-3 py-10 items-center" onPress={onRefresh} activeOpacity={0.7}>
+      <Text className="text-[#6B7280] text-sm">No events created yet</Text>
+    </TouchableOpacity>
+  ) : null;
+  const emptyJoined = !loading ? (
+    <TouchableOpacity className="px-3 py-10 items-center" onPress={onRefresh} activeOpacity={0.7}>
+      <Text className="text-[#6B7280] text-sm">No events joined yet</Text>
+    </TouchableOpacity>
+  ) : null;
+  const emptyLiked = !loading ? (
+    <TouchableOpacity className="px-3 py-10 items-center" onPress={onRefresh} activeOpacity={0.7}>
+      <Text className="text-[#6B7280] text-sm">No events liked yet</Text>
+    </TouchableOpacity>
+  ) : null;
+
+  const likedFooter = (
+    <View className="flex-row items-center justify-center gap-2 px-4 py-6">
+      <Text className="text-[#6B7280] text-sm text-center flex-1">
+        Choose who can see your liked events on your public profile
+      </Text>
+      <TouchableOpacity
+        onPress={() => router.push('/settings?open=liked')}
+        activeOpacity={0.7}
+        className="w-8 h-8 rounded-full bg-gray-100 items-center justify-center"
+      >
+        <MaterialIcons name="edit" size={18} color="#DC2626" />
+      </TouchableOpacity>
+    </View>
+  );
+
+  const listProps = {
+    style: { flex: 1 },
+    contentContainerStyle: { paddingTop: 0, paddingBottom: bottomPadding, paddingHorizontal: 2 },
+    keyExtractor: (item: any) => item.id,
+    numColumns: 2,
+    columnWrapperStyle: { gap: 4, marginBottom: 4 } as const,
+    renderItem: renderProfileEventCard,
+    refreshControl: (
+      <RefreshControl
+        refreshing={refreshing}
+        onRefresh={onRefresh}
+        tintColor="#DC2626"
+        colors={['#DC2626']}
       />
+    ),
+  };
+
+  return (
+    <View className="flex-1 bg-white">
+      {profileFixedHeader}
+      <View
+        style={{ flex: 1 }}
+        onLayout={handlePagerLayout}
+      >
+        <ScrollView
+          ref={pagerRef}
+          horizontal
+          pagingEnabled
+          decelerationRate="fast"
+          showsHorizontalScrollIndicator={false}
+          onMomentumScrollEnd={handlePagerScrollEnd}
+          onScrollEndDrag={handlePagerScrollEnd}
+          scrollEventThrottle={16}
+          style={{ flex: 1 }}
+          contentContainerStyle={{ flexGrow: 1 }}
+        >
+          <View style={{ width: pagerWidth, flex: 1 }}>
+            <FlatList
+              key="created"
+              data={createdListData}
+              ListEmptyComponent={emptyCreated}
+              {...listProps}
+            />
+          </View>
+          <View style={{ width: pagerWidth, flex: 1 }}>
+            <FlatList
+              key="joined"
+              data={joinedListData}
+              ListEmptyComponent={emptyJoined}
+              {...listProps}
+            />
+          </View>
+          <View style={{ width: pagerWidth, flex: 1 }}>
+            <FlatList
+              key="liked"
+              data={likedListData}
+              ListEmptyComponent={emptyLiked}
+              ListFooterComponent={likedFooter}
+              {...listProps}
+            />
+          </View>
+        </ScrollView>
+      </View>
 
       <Modal
         visible={showPermissionModal}
@@ -1025,6 +1059,11 @@ export default function ProfileScreen() {
             <FlatList
               data={listModal === 'followers' ? ((user as any)?.followers ?? []) : ((user as any)?.following ?? [])}
               keyExtractor={(item: PublicUserSummary) => item._id}
+              initialNumToRender={12}
+              windowSize={5}
+              maxToRenderPerBatch={10}
+              updateCellsBatchingPeriod={50}
+              removeClippedSubviews
               renderItem={({ item }: { item: PublicUserSummary }) => (
                 <TouchableOpacity
                   className="flex-row items-center py-3 px-4 border-b border-gray-100"
@@ -1032,7 +1071,7 @@ export default function ProfileScreen() {
                     setListModal(null);
                     if (item._id !== user?._id) {
                       // Coming from profile tab
-                      router.push(`/(tabs)/user/${item._id}?comeFrom=profile`);
+                      router.push(`/user/${item._id}?comeFrom=profile`);
                     }
                   }}
                   activeOpacity={0.7}

@@ -32,7 +32,7 @@ import AnimatedReanimated, {
   withTiming,
   cancelAnimation,
 } from 'react-native-reanimated';
-import { getEventImageUrl } from '@/lib/utils/imageUtils';
+import { getEventImageUrl, getProfileImageUrl } from '@/lib/utils/imageUtils';
 import { QRScanner } from '@/components/QRScanner';
 import { Modal } from '@/components/Modal';
 
@@ -607,6 +607,31 @@ export default function CreatedEventDetailsScreen() {
               </View>
               <MaterialIcons name="chevron-right" size={18} color="#9CA3AF" />
             </TouchableOpacity>
+
+            {/* Organized by (host) - show current user / event creator */}
+            {(user || (event as any)?.createdBy) && (
+              <View className="flex-row items-center py-2 mb-2 border-t border-gray-100 pt-3">
+                <View className="w-10 h-10 rounded-full bg-primary overflow-hidden mr-3 items-center justify-center">
+                  {getProfileImageUrl((event as any)?.createdBy || user as any) ? (
+                    <Image
+                      source={{ uri: getProfileImageUrl((event as any)?.createdBy || user as any) || '' }}
+                      className="w-full h-full"
+                      resizeMode="cover"
+                    />
+                  ) : (
+                    <Text className="text-white text-base font-bold">
+                      {((event as any)?.createdBy?.fullName ?? user?.fullName ?? '?').charAt(0).toUpperCase()}
+                    </Text>
+                  )}
+                </View>
+                <View className="flex-1">
+                  <Text className="text-gray-500 text-[10px] font-medium mb-0.5">Organized by</Text>
+                  <Text className="text-gray-900 text-sm font-semibold">
+                    {(event as any)?.createdBy?.fullName ?? user?.fullName ?? '—'}
+                  </Text>
+                </View>
+              </View>
+            )}
           </View>
 
           {/* Tabs Section - Compact */}

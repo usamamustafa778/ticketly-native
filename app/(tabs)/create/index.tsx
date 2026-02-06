@@ -1,7 +1,8 @@
-import { useRouter } from 'expo-router';
-import React, { useState, useCallback } from 'react';
-import { Text, TouchableOpacity, View, ScrollView, RefreshControl } from 'react-native';
+import { ButtonPrimary } from '@/components/ui';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
+import { useRouter } from 'expo-router';
+import React, { useCallback, useState } from 'react';
+import { RefreshControl, ScrollView, Text, View } from 'react-native';
 
 export default function CreateTabScreen() {
     const router = useRouter();
@@ -32,12 +33,12 @@ export default function CreateTabScreen() {
                 <Text className="text-base text-gray-600 text-center mb-8">
                     Start creating amazing events and reach your audience
                 </Text>
-                <TouchableOpacity
-                    className="bg-primary py-2.5 px-8 rounded-xl"
+                <ButtonPrimary
+                    size="lg"
                     onPress={() => router.push('/create/create-event')}
                 >
-                    <Text className="text-white text-sm font-semibold">Get Started</Text>
-                </TouchableOpacity>
+                    Get Started
+                </ButtonPrimary>
             </View>
         </ScrollView>
     );

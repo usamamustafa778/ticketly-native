@@ -365,14 +365,19 @@ export default function SettingsScreen() {
                   placeholder="Tell people what kind of events you host or enjoy"
                   value={bio}
                   onChangeText={(text) => {
-                    setBio(text);
+                    const next = text.slice(0, 160);
+                    setBio(next);
                     if (bioError) setBioError('');
                   }}
                   error={bioError}
                   multiline
                   numberOfLines={3}
-                  className="mb-3"
+                  maxLength={160}
+                  className="mb-1"
                 />
+                <Text className="text-[10px] text-gray-500 text-right mb-3">
+                  {bio.length}/160
+                </Text>
                 <ButtonPrimary
                   disabled={false}
                   onPress={handleUpdateBio}

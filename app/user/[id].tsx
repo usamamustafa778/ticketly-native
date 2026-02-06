@@ -12,16 +12,16 @@ import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useState } from 'react';
 import {
-    ActivityIndicator,
-    Dimensions,
-    FlatList,
-    Image,
-    Pressable,
-    RefreshControl,
-    Modal as RNModal,
-    Text,
-    TouchableOpacity,
-    View,
+  ActivityIndicator,
+  Dimensions,
+  FlatList,
+  Image,
+  Pressable,
+  RefreshControl,
+  Modal as RNModal,
+  Text,
+  TouchableOpacity,
+  View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -233,11 +233,11 @@ export default function UserProfileScreen() {
         contentContainerStyle={{
           paddingTop: 0,
           paddingBottom: bottomPadding,
-          paddingHorizontal: 6,
+          paddingHorizontal: 2,
         }}
         keyExtractor={(item) => item.id}
         numColumns={2}
-        columnWrapperStyle={{ gap: 6, marginBottom: 6 }}
+        columnWrapperStyle={{ gap: 4, marginBottom: 4 }}
         renderItem={({ item }) => (
           <View className="flex-1">
             <EventCard
@@ -329,19 +329,7 @@ export default function UserProfileScreen() {
                       {profile.companyName}
                     </Text>
                   )}
-                  {profile.bio && (
-                    <TouchableOpacity
-                      activeOpacity={0.7}
-                      onPress={() => setIsBioExpanded((prev) => !prev)}
-                    >
-                      <Text
-                        className="text-gray-600 text-sm mt-1"
-                        numberOfLines={isBioExpanded ? undefined : 3}
-                      >
-                        {profile.bio}
-                      </Text>
-                    </TouchableOpacity>
-                  )}
+                 
                 </View>
               </View>
 
@@ -368,6 +356,19 @@ export default function UserProfileScreen() {
                   {formatCount(createdCount)} events
                 </Text>
               </View>
+              {profile.bio && (
+                    <TouchableOpacity
+                      activeOpacity={0.7}
+                      onPress={() => setIsBioExpanded((prev) => !prev)}
+                    >
+                      <Text
+                        className="text-gray-600 text-sm mt-1"
+                        numberOfLines={isBioExpanded ? undefined : 3}
+                      >
+                        {profile.bio}
+                      </Text>
+                    </TouchableOpacity>
+                  )}
 
               {/* Action button: Follow (no DM/message) - show whenever viewing another user's profile */}
               <View className="flex-row gap-3 mt-4">
@@ -514,6 +515,11 @@ export default function UserProfileScreen() {
             <FlatList
               data={listModal === 'followers' ? (profile?.followers ?? []) : (profile?.following ?? [])}
               keyExtractor={(item) => item._id}
+              initialNumToRender={12}
+              windowSize={5}
+              maxToRenderPerBatch={10}
+              updateCellsBatchingPeriod={50}
+              removeClippedSubviews
               renderItem={({ item }: { item: PublicUserSummary }) => (
                 <TouchableOpacity
                   className="flex-row items-center py-3 px-4 border-b border-gray-100"

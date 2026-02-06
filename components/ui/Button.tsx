@@ -1,7 +1,7 @@
-import React from 'react';
-import { TouchableOpacity, Text, ActivityIndicator, ViewStyle, TextStyle } from 'react-native';
-import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { button, type Size } from '@/lib/designSystem';
+import MaterialIcons from '@expo/vector-icons/MaterialIcons';
+import React from 'react';
+import { ActivityIndicator, Text, TouchableOpacity } from 'react-native';
 
 export type ButtonVariant = 'primary' | 'secondary' | 'ghost' | 'outline';
 
@@ -28,7 +28,7 @@ const variantStyles: Record<ButtonVariant, { bg: string; text: string; border?: 
 export const Button: React.FC<ButtonProps> = ({
   children,
   onPress,
-  size = 'sm',
+  size = 'lg',
   variant = 'primary',
   disabled = false,
   loading = false,
@@ -48,6 +48,7 @@ export const Button: React.FC<ButtonProps> = ({
       activeOpacity={0.7}
       className={`
         flex-row items-center justify-center
+        px-4
         ${preset.container}
         ${variantStyle.bg}
         ${variantStyle.border ?? ''}

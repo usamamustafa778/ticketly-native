@@ -1,22 +1,21 @@
-import React, { useState, useCallback } from 'react';
-import {
-  View,
-  FlatList,
-  Text,
-  RefreshControl,
-  TouchableOpacity,
-  ActivityIndicator,
-  Image,
-  Pressable,
-} from 'react-native';
-import { useRouter } from 'expo-router';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useFocusEffect } from 'expo-router';
-import MaterialIcons from '@expo/vector-icons/MaterialIcons';
+import { useBottomPadding } from '@/hooks/useBottomPadding';
 import { notificationsAPI, type NotificationItem } from '@/lib/api/notifications';
 import { getEventImageUrl, getProfileImageUrl } from '@/lib/utils/imageUtils';
-import { useBottomPadding } from '@/hooks/useBottomPadding';
 import { useAppStore } from '@/store/useAppStore';
+import MaterialIcons from '@expo/vector-icons/MaterialIcons';
+import { useFocusEffect, useRouter } from 'expo-router';
+import React, { useCallback, useState } from 'react';
+import {
+    ActivityIndicator,
+    FlatList,
+    Image,
+    Pressable,
+    RefreshControl,
+    Text,
+    TouchableOpacity,
+    View,
+} from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 function formatTimeAgo(dateStr: string): string {
   const date = new Date(dateStr);
@@ -161,7 +160,7 @@ export default function NotificationsScreen() {
       router.push(`/event-details/${item.eventId._id}?returnTo=notifications`);
     } else if (item.actorUserId?._id) {
       // Open user profile inside the tabs group and tag origin so back goes to Notifications
-      router.push(`/(tabs)/user/${item.actorUserId._id}?comeFrom=notifications`);
+      router.push(`/user/${item.actorUserId._id}?comeFrom=notifications`);
     }
   };
 

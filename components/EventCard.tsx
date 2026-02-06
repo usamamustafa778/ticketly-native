@@ -1,10 +1,10 @@
-import React, { useState } from 'react';
-import { View, Text, TouchableOpacity, Image, Modal, Pressable, ScrollView, Dimensions } from 'react-native';
-import { Event } from '@/data/mockData';
-import { useRouter } from 'expo-router';
-import { getEventImageUrl } from '@/lib/utils/imageUtils';
 import { Label } from '@/components/ui/Label';
+import { Event } from '@/data/mockData';
+import { getEventImageUrl } from '@/lib/utils/imageUtils';
 import { LinearGradient } from 'expo-linear-gradient';
+import { useRouter } from 'expo-router';
+import React, { useState } from 'react';
+import { Dimensions, Image, Modal, Pressable, ScrollView, Text, TouchableOpacity, View } from 'react-native';
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 const DROPUP_HEIGHT = SCREEN_HEIGHT * 0.7;

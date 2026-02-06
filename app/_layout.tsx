@@ -3,7 +3,7 @@ import { useFonts } from 'expo-font';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect, useState } from 'react';
-import { View, Text, ActivityIndicator } from 'react-native';
+import { ActivityIndicator, Text, View } from 'react-native';
 import 'react-native-reanimated';
 
 // Try to import global.css, but don't fail if it doesn't work
@@ -13,8 +13,8 @@ try {
   console.warn('Could not load global.css:', e);
 }
 
-import { useColorScheme } from '@/hooks/useColorScheme';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
+import { useColorScheme } from '@/hooks/useColorScheme';
 import { setOnSessionExpired } from '@/lib/api/sessionExpired';
 import { useAppStore } from '@/store/useAppStore';
 
@@ -72,6 +72,12 @@ export default function RootLayout() {
           screenOptions={{
             headerShown: false,
             contentStyle: { paddingHorizontal: 4 },
+            // Smooth horizontal card-style transitions for all stack screens
+            animation: 'slide_from_right',
+            gestureEnabled: true,
+            gestureDirection: 'horizontal',
+            // Make the transition feel slower/smoother
+            animationDuration: 100,
           }}
           initialRouteName="(tabs)"
         >
