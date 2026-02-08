@@ -10,15 +10,19 @@ import { getEventImageUrl, getProfileImageUrl } from '@/lib/utils/imageUtils';
 import { useAppStore } from '@/store/useAppStore';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Dimensions,
   FlatList,
   Image,
+  LayoutChangeEvent,
+  NativeScrollEvent,
+  NativeSyntheticEvent,
   Pressable,
   RefreshControl,
   Modal as RNModal,
+  ScrollView,
   Text,
   TouchableOpacity,
   View,
@@ -115,6 +119,10 @@ export default function UserProfileScreen() {
   // Dynamic bottom padding: Gestures (insets.bottom > 0) = safe area + 20px; Buttons (insets.bottom === 0) = 10px
   const bottomPadding = useBottomPadding();
 
+  const TAB_ORDER: TabKey[] = ['created', 'joined', 'liked'];
+  const [pagerWidth, setPagerWidth] = useState(Dimensions.get('window').width);
+  const pagerRef = useRef<ScrollView | null>(null);
+
   const fetchProfile = useCallback(
     async (showRefreshing = false) => {
       if (!id) {
@@ -198,10 +206,21 @@ export default function UserProfileScreen() {
   const createdCount = createdEvents.length;
   const formatCount = (n: number) => (n >= 1000 ? `${(n / 1000).toFixed(1)}K` : String(n));
 
-  const currentEvents =
-    activeTab === 'created' ? createdEvents : activeTab === 'joined' ? joinedEvents : likedEvents;
-
   const profileImageUrl = profile ? (getProfileImageUrl(profile) || undefined) : undefined;
+
+  // Data per tab for horizontal pager (mirrors profile tab behavior)
+  const createdListData = useMemo(
+    () => createdEvents.map((e, index) => ({ ...e, id: e.id || `created-${index}` })),
+    [createdEvents]
+  );
+  const joinedListData = useMemo(
+    () => joinedEvents.map((e, index) => ({ ...e, id: e.id || `joined-${index}` })),
+    [joinedEvents]
+  );
+  const likedListData = useMemo(
+    () => likedEvents.map((e, index) => ({ ...e, id: e.id || `liked-${index}` })),
+    [likedEvents]
+  );
 
   if (loading && !profile) {
     return (
@@ -224,213 +243,308 @@ export default function UserProfileScreen() {
     );
   }
 
+  const handleTabSelect = (key: TabKey) => {
+    setActiveTab(key);
+    const index = TAB_ORDER.indexOf(key);
+    if (pagerRef.current) {
+      pagerRef.current.scrollTo({ x: index * pagerWidth, animated: true });
+    }
+  };
+
+  const handlePagerScrollEnd = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
+    const x = e.nativeEvent.contentOffset.x;
+    const index = Math.round(x / pagerWidth);
+    const tab = TAB_ORDER[Math.max(0, Math.min(index, TAB_ORDER.length - 1))];
+    setActiveTab(tab);
+  };
+
+  const handlePagerLayout = (e: LayoutChangeEvent) => {
+    const w = e.nativeEvent.layout.width;
+    if (w > 0) setPagerWidth(w);
+  };
+
+  const renderUserEventCard = ({ item }: { item: any }) => {
+    return (
+      <View className="flex-1">
+        <EventCard
+          event={item}
+          onPress={() => {
+            const eventId = item.id || item._id;
+            if (!eventId) return;
+            router.push(`/event-details/${eventId}`);
+          }}
+        />
+      </View>
+    );
+  };
+
+  const emptyCreated = (
+    <View className="px-3 py-10 items-center">
+      <MaterialIcons name="event-busy" size={48} color="#94a3b8" />
+      <Text className="text-gray-500 text-base mt-3">No created events yet</Text>
+    </View>
+  );
+  const emptyJoined = (
+    <View className="px-3 py-10 items-center">
+      <MaterialIcons name="event-busy" size={48} color="#94a3b8" />
+      <Text className="text-gray-500 text-base mt-3">No joined events yet</Text>
+    </View>
+  );
+  const emptyLiked = (
+    <View className="px-3 py-10 items-center">
+      <MaterialIcons name="event-busy" size={48} color="#94a3b8" />
+      <Text className="text-gray-500 text-base mt-3">No liked events yet</Text>
+    </View>
+  );
+
+  const listProps = {
+    style: { flex: 1 },
+    contentContainerStyle: { paddingTop: 0, paddingBottom: bottomPadding, paddingHorizontal: 2 },
+    keyExtractor: (item: any) => item.id,
+    numColumns: 2,
+    columnWrapperStyle: { gap: 4, marginBottom: 4 } as const,
+    renderItem: renderUserEventCard,
+    refreshControl: (
+      <RefreshControl
+        refreshing={refreshing}
+        onRefresh={onRefresh}
+        tintColor="#2563EB"
+        colors={['#2563EB']}
+      />
+    ),
+  };
+
+  const userProfileFixedHeader = (
+    <>
+      {/* Banner / Cover (no rounded corners, like event-detail) */}
+      <View className="w-full overflow-hidden" style={{ height: 160 }}>
+        {/* Cover image background */}
+        {profile.coverImageUrl ? (
+          <Image
+            source={{ uri: getProfileImageUrl({ profileImageUrl: profile.coverImageUrl }) || '' }}
+            className="w-full h-full"
+            resizeMode="cover"
+          />
+        ) : (
+          <View className="w-full h-full" style={{ backgroundColor: '#0f766e' }} />
+        )}
+
+        {/* Tap area for viewing cover in full screen (only if cover exists) */}
+        {profile.coverImageUrl && (
+          <TouchableOpacity
+            activeOpacity={1}
+            onPress={() => setShowCoverViewer(true)}
+            style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, zIndex: 1 }}
+          />
+        )}
+
+        {/* Nav overlays on banner */}
+        <View
+          pointerEvents="box-none"
+          className="absolute inset-0 flex-row justify-between items-start px-4"
+          style={{ paddingTop: insets.top + 8, zIndex: 5 }}
+        >
+          <BackButton variant="dark" onPress={handleBack} />
+          <View className="flex-row gap-2">
+            <TouchableOpacity
+              className="w-9 h-9 rounded-full bg-black/30 items-center justify-center"
+              onPress={() => {}}
+            >
+              <MaterialIcons name="more-horiz" size={22} color="#fff" />
+            </TouchableOpacity>
+            <TouchableOpacity
+              className="w-9 h-9 rounded-full bg-black/30 items-center justify-center"
+              onPress={() => {}}
+            >
+              <MaterialIcons name="search" size={22} color="#fff" />
+            </TouchableOpacity>
+          </View>
+        </View>
+      </View>
+
+      {/* Bottom page container: white card with rounded top (like event-detail) */}
+      <View className="bg-white rounded-t-3xl -mt-5 border-t border-gray-200">
+        {/* Profile pic overlapping + name + stats + actions */}
+        <View className="px-4" style={{ marginTop: -32 }}>
+          <View className="flex-row items-end">
+            <TouchableOpacity
+              onPress={() => setShowImageViewer(true)}
+              activeOpacity={0.8}
+              className="rounded-full overflow-hidden border-4 border-white bg-primary"
+              style={{ width: 96, height: 96 }}
+            >
+              {profileImageUrl ? (
+                <Image source={{ uri: profileImageUrl }} className="w-full h-full" resizeMode="cover" />
+              ) : (
+                <View className="w-full h-full items-center justify-center">
+                  <Text className="text-white text-3xl font-bold">
+                    {(profile.fullName || profile.username || '?').charAt(0).toUpperCase()}
+                  </Text>
+                </View>
+              )}
+            </TouchableOpacity>
+            <View className="flex-1 ml-4 pb-1">
+              <Text className="text-gray-900 text-xl font-bold" numberOfLines={1}>
+                {profile.fullName || profile.username || 'User'}
+              </Text>
+              {profile.username && (
+                <Text className="text-gray-500 text-sm mt-0.5">@{profile.username}</Text>
+              )}
+              {profile.companyName && (
+                <Text className="text-primary text-sm font-semibold mt-0.5">
+                  {profile.companyName}
+                </Text>
+              )}
+            </View>
+          </View>
+
+          <View className="flex-row flex-wrap items-center mt-3 gap-1">
+            <TouchableOpacity
+              onPress={() =>
+                profile?.followersVisibility === 'public' ? setListModal('followers') : null
+              }
+              activeOpacity={profile?.followersVisibility === 'public' ? 0.7 : 1}
+            >
+              <Text className="text-gray-700 text-sm font-semibold">
+                {formatCount(profile?.followerCount ?? 0)} followers
+              </Text>
+            </TouchableOpacity>
+            <Text className="text-gray-400 text-sm"> • </Text>
+            <TouchableOpacity
+              onPress={() =>
+                profile?.followingVisibility === 'public' ? setListModal('following') : null
+              }
+              activeOpacity={profile?.followingVisibility === 'public' ? 0.7 : 1}
+            >
+              <Text className="text-gray-700 text-sm font-semibold">
+                {formatCount(profile?.followingCount ?? 0)} following
+              </Text>
+            </TouchableOpacity>
+            <Text className="text-gray-400 text-sm"> • </Text>
+            <Text className="text-gray-700 text-sm font-semibold">
+              {formatCount(createdCount)} events
+            </Text>
+          </View>
+          {profile.bio && (
+            <TouchableOpacity
+              activeOpacity={0.7}
+              onPress={() => setIsBioExpanded((prev) => !prev)}
+            >
+              <Text
+                className="text-gray-600 text-sm mt-1"
+                numberOfLines={isBioExpanded ? undefined : 3}
+              >
+                {profile.bio}
+              </Text>
+            </TouchableOpacity>
+          )}
+
+          {/* Action button: Follow / Edit profile */}
+          <View className="flex-row gap-3 mt-4">
+            {isOtherUserProfile && (
+              <TouchableOpacity
+                onPress={handleFollowToggle}
+                disabled={followLoading || !currentUserId}
+                activeOpacity={0.8}
+                className="flex-1 flex-row items-center justify-center gap-2 py-2.5 border border-black rounded-full bg-white"
+              >
+                {followLoading ? (
+                  <ActivityIndicator size="small" color="#DC2626" />
+                ) : (
+                  <>
+                    <MaterialIcons
+                      name={profile?.isFollowing ? 'person' : 'person-add'}
+                      size={20}
+                      color="#DC2626"
+                    />
+                    <Text className="font-semibold text-sm text-primary">
+                      {profile?.isFollowing ? 'Following' : 'Follow'}
+                    </Text>
+                  </>
+                )}
+              </TouchableOpacity>
+            )}
+            {isOwnProfile && (
+              <TouchableOpacity
+                className="flex-1 flex-row items-center justify-center gap-2 py-2.5 rounded-full bg-gray-200"
+                activeOpacity={0.8}
+                onPress={() => router.push('/settings')}
+              >
+                <MaterialIcons name="edit" size={20} color="#374151" />
+                <Text className="font-semibold text-sm text-gray-700">Edit profile</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+        </View>
+
+        {/* Tabs */}
+        <View className="mx-4 mt-5 mb-2">
+          <TabsRow
+            items={[
+              { key: 'created', label: 'Created Events' },
+              { key: 'joined', label: 'Joined Events' },
+              ...(showLikedTab ? [{ key: 'liked' as TabKey, label: 'Liked Events' }] : []),
+            ]}
+            activeKey={activeTab}
+            onSelect={handleTabSelect}
+          />
+        </View>
+      </View>
+    </>
+  );
+
   return (
     <View className="flex-1 bg-white">
-      <FlatList
-        key={activeTab}
-        data={currentEvents}
+      {userProfileFixedHeader}
+      <View
         style={{ flex: 1 }}
-        contentContainerStyle={{
-          paddingTop: 0,
-          paddingBottom: bottomPadding,
-          paddingHorizontal: 2,
-        }}
-        keyExtractor={(item) => item.id}
-        numColumns={2}
-        columnWrapperStyle={{ gap: 4, marginBottom: 4 }}
-        renderItem={({ item }) => (
-          <View className="flex-1">
-            <EventCard
-              event={item}
-              onPress={() => router.push(`/event-details/${item.id}`)}
+        onLayout={handlePagerLayout}
+      >
+        <ScrollView
+          ref={pagerRef}
+          horizontal
+          pagingEnabled
+          decelerationRate="fast"
+          showsHorizontalScrollIndicator={false}
+          onMomentumScrollEnd={handlePagerScrollEnd}
+          onScrollEndDrag={handlePagerScrollEnd}
+          scrollEventThrottle={16}
+          style={{ flex: 1 }}
+          contentContainerStyle={{ flexGrow: 1 }}
+        >
+          {/* Created */}
+          <View style={{ width: pagerWidth, flex: 1 }}>
+            <FlatList
+              key="created"
+              data={createdListData}
+              ListEmptyComponent={emptyCreated}
+              {...listProps}
             />
           </View>
-        )}
-        refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={onRefresh}
-            tintColor="#2563EB"
-            colors={['#2563EB']}
-          />
-        }
-        ListHeaderComponent={
-          <>
-            {/* Banner / Cover (no rounded corners, like event-detail) */}
-            <View className="w-full overflow-hidden" style={{ height: 160 }}>
-              {/* Cover image background */}
-              {profile.coverImageUrl ? (
-                <Image
-                  source={{ uri: getProfileImageUrl({ profileImageUrl: profile.coverImageUrl }) || '' }}
-                  className="w-full h-full"
-                  resizeMode="cover"
-                />
-              ) : (
-                <View className="w-full h-full" style={{ backgroundColor: '#0f766e' }} />
-              )}
-              
-              {/* Tap area for viewing cover in full screen (only if cover exists) */}
-              {profile.coverImageUrl && (
-                <TouchableOpacity
-                  activeOpacity={1}
-                  onPress={() => setShowCoverViewer(true)}
-                  style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, zIndex: 1 }}
-                />
-              )}
-              
-              {/* Nav overlays on banner */}
-              <View
-                pointerEvents="box-none"
-                className="absolute inset-0 flex-row justify-between items-start px-4"
-                style={{ paddingTop: insets.top + 8, zIndex: 5 }}
-              >
-                <BackButton variant="dark" onPress={handleBack} />
-                <View className="flex-row gap-2">
-                  <TouchableOpacity className="w-9 h-9 rounded-full bg-black/30 items-center justify-center" onPress={() => {}}>
-                    <MaterialIcons name="more-horiz" size={22} color="#fff" />
-                  </TouchableOpacity>
-                  <TouchableOpacity className="w-9 h-9 rounded-full bg-black/30 items-center justify-center" onPress={() => {}}>
-                    <MaterialIcons name="search" size={22} color="#fff" />
-                  </TouchableOpacity>
-                </View>
-              </View>
-            </View>
 
-            {/* Bottom page container: white card with rounded top (like event-detail) */}
-            <View className="bg-white rounded-t-3xl -mt-5 border-t border-gray-200">
-            {/* Profile pic overlapping + name + stats + actions */}
-            <View className="px-4" style={{ marginTop: -32 }}>
-              <View className="flex-row items-end">
-                <TouchableOpacity
-                  onPress={() => setShowImageViewer(true)}
-                  activeOpacity={0.8}
-                  className="rounded-full overflow-hidden border-4 border-white bg-primary"
-                  style={{ width: 96, height: 96 }}
-                >
-                  {profileImageUrl ? (
-                    <Image source={{ uri: profileImageUrl }} className="w-full h-full" resizeMode="cover" />
-                  ) : (
-                    <View className="w-full h-full items-center justify-center">
-                      <Text className="text-white text-3xl font-bold">
-                        {(profile.fullName || profile.username || '?').charAt(0).toUpperCase()}
-                      </Text>
-                    </View>
-                  )}
-                </TouchableOpacity>
-                <View className="flex-1 ml-4 pb-1">
-                  <Text className="text-gray-900 text-xl font-bold" numberOfLines={1}>
-                    {profile.fullName || profile.username || 'User'}
-                  </Text>
-                  {profile.username && (
-                    <Text className="text-gray-500 text-sm mt-0.5">@{profile.username}</Text>
-                  )}
-                  {profile.companyName && (
-                    <Text className="text-primary text-sm font-semibold mt-0.5">
-                      {profile.companyName}
-                    </Text>
-                  )}
-                 
-                </View>
-              </View>
+          {/* Joined */}
+          <View style={{ width: pagerWidth, flex: 1 }}>
+            <FlatList
+              key="joined"
+              data={joinedListData}
+              ListEmptyComponent={emptyJoined}
+              {...listProps}
+            />
+          </View>
 
-              <View className="flex-row flex-wrap items-center mt-3 gap-1">
-                <TouchableOpacity
-                  onPress={() => (profile?.followersVisibility === 'public' ? setListModal('followers') : null)}
-                  activeOpacity={profile?.followersVisibility === 'public' ? 0.7 : 1}
-                >
-                  <Text className="text-gray-700 text-sm font-semibold">
-                    {formatCount(profile?.followerCount ?? 0)} followers
-                  </Text>
-                </TouchableOpacity>
-                <Text className="text-gray-400 text-sm"> • </Text>
-                <TouchableOpacity
-                  onPress={() => (profile?.followingVisibility === 'public' ? setListModal('following') : null)}
-                  activeOpacity={profile?.followingVisibility === 'public' ? 0.7 : 1}
-                >
-                  <Text className="text-gray-700 text-sm font-semibold">
-                    {formatCount(profile?.followingCount ?? 0)} following
-                  </Text>
-                </TouchableOpacity>
-                <Text className="text-gray-400 text-sm"> • </Text>
-                <Text className="text-gray-700 text-sm font-semibold">
-                  {formatCount(createdCount)} events
-                </Text>
-              </View>
-              {profile.bio && (
-                    <TouchableOpacity
-                      activeOpacity={0.7}
-                      onPress={() => setIsBioExpanded((prev) => !prev)}
-                    >
-                      <Text
-                        className="text-gray-600 text-sm mt-1"
-                        numberOfLines={isBioExpanded ? undefined : 3}
-                      >
-                        {profile.bio}
-                      </Text>
-                    </TouchableOpacity>
-                  )}
-
-              {/* Action button: Follow (no DM/message) - show whenever viewing another user's profile */}
-              <View className="flex-row gap-3 mt-4">
-                {isOtherUserProfile && (
-                  <TouchableOpacity
-                    onPress={handleFollowToggle}
-                    disabled={followLoading || !currentUserId}
-                    activeOpacity={0.8}
-                    className="flex-1 flex-row items-center justify-center gap-2 py-2.5 border border-black rounded-full bg-white"
-                  >
-                    {followLoading ? (
-                      <ActivityIndicator size="small" color="#DC2626" />
-                    ) : (
-                      <>
-                        <MaterialIcons
-                          name={profile?.isFollowing ? 'person' : 'person-add'}
-                          size={20}
-                          color="#DC2626"
-                        />
-                        <Text className="font-semibold text-sm text-primary">
-                          {profile?.isFollowing ? 'Following' : 'Follow'}
-                        </Text>
-                      </>
-                    )}
-                  </TouchableOpacity>
-                )}
-                {isOwnProfile && (
-                  <TouchableOpacity
-                    className="flex-1 flex-row items-center justify-center gap-2 py-2.5 rounded-full bg-gray-200"
-                    activeOpacity={0.8}
-                    onPress={() => router.push('/settings')}
-                  >
-                    <MaterialIcons name="edit" size={20} color="#374151" />
-                    <Text className="font-semibold text-sm text-gray-700">Edit profile</Text>
-                  </TouchableOpacity>
-                )}
-              </View>
-            </View>
-
-            {/* Tabs: use shared TabsRow component (original design) */}
-            <View className="mx-4 mt-5 mb-2">
-              <TabsRow
-                items={[
-                  { key: 'created', label: 'Created Events' },
-                  { key: 'joined', label: 'Joined Events' },
-                  ...(showLikedTab ? [{ key: 'liked' as TabKey, label: 'Liked Events' }] : []),
-                ]}
-                activeKey={activeTab}
-                onSelect={setActiveTab}
+          {/* Liked */}
+          {showLikedTab && (
+            <View style={{ width: pagerWidth, flex: 1 }}>
+              <FlatList
+                key="liked"
+                data={likedListData}
+                ListEmptyComponent={emptyLiked}
+                {...listProps}
               />
             </View>
-            </View>
-          </>
-        }
-        ListEmptyComponent={
-          <View className="px-3 py-10 items-center">
-            <MaterialIcons name="event-busy" size={48} color="#94a3b8" />
-            <Text className="text-gray-500 text-base mt-3">No {activeTab} events yet</Text>
-          </View>
-        }
-      />
-
+          )}
+        </ScrollView>
+      </View>
       {/* Profile Image Viewer (same as profile page) */}
       <RNModal
         visible={showImageViewer}
