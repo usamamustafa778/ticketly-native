@@ -11,7 +11,7 @@ import AnimatedReanimated, {
   withTiming,
   cancelAnimation,
 } from 'react-native-reanimated';
-import { getEventImageUrl, getProfileImageUrl } from '@/lib/utils/imageUtils';
+import { getEventImageUrl, getProfileImageUrl, EVENT_PLACEHOLDER } from '@/lib/utils/imageUtils';
 import {
   Animated,
   Easing,
@@ -75,7 +75,7 @@ const convertEvent = (apiEvent: Event): AppEvent => {
     venue: location,
     city: location.split(',')[0] || location,
     category: categoryForDisplay(apiEvent.category),
-    image: getEventImageUrl(apiEvent) || 'https://images.unsplash.com/photo-1470229722913-7c0e2dbbafd3?w=800',
+    image: getEventImageUrl(apiEvent) || EVENT_PLACEHOLDER,
     organizerId: apiEvent.createdBy?._id || '',
     organizerName: apiEvent.createdBy?.fullName || apiEvent.organizerName || 'Organizer',
     price,
@@ -407,7 +407,7 @@ export default function ExploreScreen() {
                         className="overflow-hidden max-w-[50%] bg-gray-200"
                       >
                         <Image
-                          source={{ uri: event.image || 'https://images.unsplash.com/photo-1470229722913-7c0e2dbbafd3?w=800' }}
+                          source={{ uri: getEventImageUrl(event) || EVENT_PLACEHOLDER }}
                           className="w-full h-full "
                           resizeMode="cover"
                         />

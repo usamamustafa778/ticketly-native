@@ -7,7 +7,7 @@ import { TabsRow } from '@/components/ui/Tabs';
 import { useBottomPadding } from '@/hooks/useBottomPadding';
 import { authAPI, PROFILE_CACHE_KEY, type PublicUserSummary } from '@/lib/api/auth';
 import { eventsAPI } from '@/lib/api/events';
-import { getEventImageUrl, getProfileImageUrl } from '@/lib/utils/imageUtils';
+import { getEventImageUrl, getProfileImageUrl, EVENT_PLACEHOLDER } from '@/lib/utils/imageUtils';
 import { useAppStore } from '@/store/useAppStore';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -58,7 +58,7 @@ const convertEvent = (apiEvent: any, currentUserProfileImageUrl?: string | null)
     venue: apiEvent.location || '',
     city: (apiEvent.location || '').split(',')[0] || apiEvent.location || '',
     category: 'Event',
-    image: getEventImageUrl(apiEvent) || 'https://images.unsplash.com/photo-1470229722913-7c0e2dbbafd3?w=800',
+    image: getEventImageUrl(apiEvent) || EVENT_PLACEHOLDER,
     organizerId: apiEvent.createdBy?._id || apiEvent.createdBy?.id || '',
     organizerName: apiEvent.createdBy?.fullName || 'Organizer',
     price: apiEvent.ticketPrice || 0,
@@ -722,14 +722,15 @@ export default function ProfileScreen() {
                 <View className="flex-row items-end">
                   <View className="relative">
                     <TouchableOpacity
-                      onPress={() => setShowImageViewer(true)}
+                      onPress={() => {setShowImageViewer(true); console.log('uri: ', profileImageUrl)}}
                       activeOpacity={0.8}
                       disabled={uploadingImage}
+                      
                       className="rounded-full overflow-hidden border-4 border-white bg-primary"
                       style={{ width: 96, height: 96 }}
                     >
                       {profileImageUrl ? (
-                        <Image source={{ uri: profileImageUrl }} className="w-full h-full" resizeMode="cover" />
+                        <Image source={{ uri: getProfileImageUrl({ profileImageUrl }) || '' }} className="w-full h-full" resizeMode="cover" />
                       ) : (
                         <View className="w-full h-full items-center justify-center">
                           <Text className="text-white text-3xl font-bold">

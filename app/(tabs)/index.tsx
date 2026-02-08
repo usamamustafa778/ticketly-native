@@ -8,7 +8,7 @@ import { authAPI, PROFILE_CACHE_KEY } from '@/lib/api/auth';
 import type { Event, SuggestedAccount } from '@/lib/api/events';
 import { eventsAPI } from '@/lib/api/events';
 import { CACHE_KEYS, getCached, setCached } from '@/lib/cache';
-import { getEventImageUrl, getProfileImageUrl } from '@/lib/utils/imageUtils';
+import { getEventImageUrl, getProfileImageUrl, EVENT_PLACEHOLDER } from '@/lib/utils/imageUtils';
 import { useAppStore } from '@/store/useAppStore';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -115,7 +115,7 @@ const convertEvent = (apiEvent: Event) => {
     venue: location,
     city: location.split(',')[0] || location,
     category: 'Event',
-    image: getEventImageUrl(apiEvent) || 'https://images.unsplash.com/photo-1470229722913-7c0e2dbbafd3?w=800',
+    image: getEventImageUrl(apiEvent) || EVENT_PLACEHOLDER,
     organizerId: apiEvent.createdBy?._id || '',
     organizerName: apiEvent.createdBy?.fullName || apiEvent.organizerName || 'Organizer',
     price,
@@ -536,13 +536,12 @@ export default function HomeScreen() {
                             <Image
                               source={{
                                 uri:
-                                  getProfileImageUrl({ profileImageUrl: account.profileImageUrl }) ||
-                                  'https://images.unsplash.com/photo-1494797710133-75adf6c1f4a3?w=200',
+                                  getProfileImageUrl({ profileImageUrl: account.profileImageUrl }) || '' 
                               }}
                               className="w-full h-full"
                               resizeMode="cover"
                             />
-                          </View>
+                          </View>   
                           <View className="flex-1">
                             <Text className="text-gray-900 font-medium" numberOfLines={1}>
                               {account.fullName || 'User'}

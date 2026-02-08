@@ -9,7 +9,7 @@ import {
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { authAPI } from '@/lib/api/auth';
-import { getEventImageUrl, getProfileImageUrl } from '@/lib/utils/imageUtils';
+import { getEventImageUrl, getProfileImageUrl, EVENT_PLACEHOLDER } from '@/lib/utils/imageUtils';
 import { EventCard } from '@/components/EventCard';
 import { EventCardSkeleton } from '@/components/EventCardSkeleton';
 import { useFocusEffect } from 'expo-router';
@@ -36,7 +36,7 @@ const convertEvent = (apiEvent: any) => {
     time: apiEvent.time || '',
     venue: apiEvent.location || '',
     city: (apiEvent.location || '').split(',')[0] || apiEvent.location || '',
-    image: getEventImageUrl(apiEvent) || 'https://images.unsplash.com/photo-1470229722913-7c0e2dbbafd3?w=800',
+    image: getEventImageUrl(apiEvent) || EVENT_PLACEHOLDER,
     organizerId: apiEvent.createdBy?._id || '',
     organizerName: apiEvent.createdBy?.fullName || apiEvent.organizerName || 'Organizer',
     price: priceValue,

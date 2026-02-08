@@ -1,5 +1,7 @@
 // Placeholder data for the event management app
 
+import { EVENT_PLACEHOLDER } from '@/lib/utils/imageUtils';
+
 export interface User {
   id: string;
   name: string;
@@ -76,7 +78,7 @@ export const mockEvents: Event[] = [
     venue: 'LUMS School Of Education, U Block',
     city: 'Lahore',
     category: 'Music',
-    image: 'https://images.unsplash.com/photo-1493225457124-a3eb161ffa5f?w=800',
+    image: EVENT_PLACEHOLDER,
     organizerId: 'org-1',
     organizerName: 'SLUMS',
     registrationDeadline: '2025-01-04T19:00:00',
@@ -96,7 +98,7 @@ export const mockEvents: Event[] = [
     venue: 'LUMS Sports Complex',
     city: 'Lahore',
     category: 'Music',
-    image: 'https://images.unsplash.com/photo-1470229722913-7c0e2dbbafd3?w=800',
+    image: EVENT_PLACEHOLDER,
     organizerId: 'org-1',
     organizerName: 'SLUMS',
     accessType: 'open',
@@ -114,7 +116,7 @@ export const mockEvents: Event[] = [
     venue: 'Sharan Forest',
     city: 'Lahore',
     category: 'Festival',
-    image: 'https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=800',
+    image: EVENT_PLACEHOLDER,
     organizerId: 'org-2',
     organizerName: 'Forest Events',
     price: 16200,
@@ -133,7 +135,7 @@ export const mockEvents: Event[] = [
     venue: 'Lahore University of Management Sciences',
     city: 'Lahore',
     category: 'Technology',
-    image: 'https://images.unsplash.com/photo-1522071820081-009f0129c71c?w=800',
+    image: EVENT_PLACEHOLDER,
     organizerId: 'org-3',
     organizerName: 'LWOC',
     accessType: 'open',
@@ -151,7 +153,7 @@ export const mockEvents: Event[] = [
     venue: 'Marina Club DHA Phase 8',
     city: 'Karachi',
     category: 'Music',
-    image: 'https://images.unsplash.com/photo-1470229722913-7c0e2dbbafd3?w=800',
+    image: EVENT_PLACEHOLDER,
     organizerId: 'org-4',
     organizerName: 'HAVI',
     accessType: 'paid',
@@ -170,7 +172,7 @@ export const mockEvents: Event[] = [
     venue: 'Alhamra Art Center, Hall 2',
     city: 'Lahore',
     category: 'Music',
-    image: 'https://images.unsplash.com/photo-1493225457124-a3eb161ffa5f?w=800',
+    image: EVENT_PLACEHOLDER,
     organizerId: 'org-5',
     organizerName: 'Eventistry',
     price: 2000,

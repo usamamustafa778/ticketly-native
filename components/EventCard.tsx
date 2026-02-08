@@ -1,6 +1,6 @@
 import { Label } from '@/components/ui/Label';
 import { Event } from '@/data/mockData';
-import { getEventImageUrl } from '@/lib/utils/imageUtils';
+import { getEventImageUrl, getProfileImageUrl, EVENT_PLACEHOLDER } from '@/lib/utils/imageUtils';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import React, { useState } from 'react';
@@ -73,7 +73,7 @@ export const EventCard: React.FC<EventCardProps> = ({ event, onPress, height: he
     >
       {/* Full background image */}
       <Image
-        source={{ uri: getEventImageUrl(event) || 'https://images.unsplash.com/photo-1470229722913-7c0e2dbbafd3?w=800' }}
+        source={{ uri: getEventImageUrl(event) || EVENT_PLACEHOLDER }}
         className="absolute inset-0 w-full h-full"
         resizeMode="cover"
       />
@@ -112,8 +112,8 @@ export const EventCard: React.FC<EventCardProps> = ({ event, onPress, height: he
                     source={{
                       uri:
                         u.avatarUrl ||
-                        u.profileImageUrl ||
-                        'https://images.unsplash.com/photo-1494797710133-75adf6c1f4a3?w=200',
+                        getProfileImageUrl({ profileImageUrl: u.profileImageUrl }) ||
+                        '',
                     }}
                     className="w-6 h-6 rounded-full border-[0.5px] border-white"
                     style={{ marginLeft: index === 0 ? 0 : -8 }}
@@ -170,7 +170,7 @@ export const EventCard: React.FC<EventCardProps> = ({ event, onPress, height: he
             <View className="flex-row items-center gap-2">
               <Image
                 source={{
-                  uri: hostAvatarUrl || 'https://images.unsplash.com/photo-1494797710133-75adf6c1f4a3?w=200',
+                  uri: hostAvatarUrl ?? getProfileImageUrl((event as any).createdBy) ?? '',
                 }}
                 className="w-6 h-6 rounded-full border-[0.5px] border-white"
                 resizeMode="cover"
@@ -250,9 +250,7 @@ export const EventCard: React.FC<EventCardProps> = ({ event, onPress, height: he
                   <Image
                     source={{
                       uri:
-                        user.avatarUrl ||
-                        user.profileImageUrl ||
-                        'https://images.unsplash.com/photo-1494797710133-75adf6c1f4a3?w=200',
+                        getProfileImageUrl({ profileImageUrl: user.profileImageUrl }) || '',
                     }}
                     className="w-6 h-6 rounded-full bg-gray-200"
                     resizeMode="cover"

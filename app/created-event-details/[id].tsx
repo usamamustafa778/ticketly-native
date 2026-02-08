@@ -32,7 +32,7 @@ import AnimatedReanimated, {
   withTiming,
   cancelAnimation,
 } from 'react-native-reanimated';
-import { getEventImageUrl, getProfileImageUrl } from '@/lib/utils/imageUtils';
+import { getEventImageUrl, getProfileImageUrl, EVENT_PLACEHOLDER } from '@/lib/utils/imageUtils';
 import { QRScanner } from '@/components/QRScanner';
 import { Modal } from '@/components/Modal';
 
@@ -441,7 +441,7 @@ export default function CreatedEventDetailsScreen() {
           onPress={() => setShowImageViewer(true)}
         >
           <Image
-            source={{ uri: getEventImageUrl(event) || 'https://via.placeholder.com/400' }}
+            source={{ uri: getEventImageUrl(event) || EVENT_PLACEHOLDER }}
             className="w-full h-full"
             resizeMode="cover"
           />
@@ -983,7 +983,7 @@ export default function CreatedEventDetailsScreen() {
           onPress={() => setShowImageViewer(false)}
         >
           <Image
-            source={{ uri: getEventImageUrl(event) || 'https://via.placeholder.com/400' }}
+            source={{ uri: getEventImageUrl(event) || EVENT_PLACEHOLDER }}
             style={{
               width: Dimensions.get('window').width,
               height: Dimensions.get('window').height,

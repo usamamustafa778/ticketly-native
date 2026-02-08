@@ -6,7 +6,7 @@ import { TabsRow } from '@/components/ui/Tabs';
 import { useBottomPadding } from '@/hooks/useBottomPadding';
 import { authAPI, type PublicUserProfile, type PublicUserSummary } from '@/lib/api/auth';
 import { CACHE_KEYS, getCached, setCached } from '@/lib/cache';
-import { getEventImageUrl, getProfileImageUrl } from '@/lib/utils/imageUtils';
+import { getEventImageUrl, getProfileImageUrl, EVENT_PLACEHOLDER } from '@/lib/utils/imageUtils';
 import { useAppStore } from '@/store/useAppStore';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -53,7 +53,7 @@ function convertEvent(apiEvent: any) {
     venue: apiEvent.location || '',
     city: (apiEvent.location || '').split(',')[0] || apiEvent.location || '',
     category: 'Event',
-    image: getEventImageUrl(apiEvent as any) || 'https://images.unsplash.com/photo-1470229722913-7c0e2dbbafd3?w=800',
+    image: getEventImageUrl(apiEvent as any) || EVENT_PLACEHOLDER,
     organizerId: apiEvent.createdBy?._id || apiEvent.createdBy?.id || '',
     organizerName: apiEvent.createdBy?.fullName || 'Organizer',
     price: priceNum,

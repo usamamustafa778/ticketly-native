@@ -4,7 +4,7 @@ import { BackButton } from '@/components/BackButton';
 import { eventsAPI } from '@/lib/api/events';
 import type { Event } from '@/lib/api/events';
 import { CACHE_KEYS, getCached, setCached } from '@/lib/cache';
-import { getEventImageUrl, getProfileImageUrl } from '@/lib/utils/imageUtils';
+import { getEventImageUrl, getProfileImageUrl, EVENT_PLACEHOLDER } from '@/lib/utils/imageUtils';
 import { useAppStore } from '@/store/useAppStore';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
@@ -50,7 +50,7 @@ function convertEvent(apiEvent: Event): AppEvent {
     venue: location,
     city: location.split(',')[0] || location,
     category: categoryForDisplay(apiEvent.category),
-    image: getEventImageUrl(apiEvent) || 'https://images.unsplash.com/photo-1470229722913-7c0e2dbbafd3?w=800',
+    image: getEventImageUrl(apiEvent) || EVENT_PLACEHOLDER,
     organizerId: apiEvent.createdBy?._id || '',
     organizerName: apiEvent.createdBy?.fullName || apiEvent.organizerName || 'Organizer',
     price,

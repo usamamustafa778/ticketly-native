@@ -5,7 +5,7 @@ import { authAPI } from '@/lib/api/auth';
 import { eventsAPI, type Event } from '@/lib/api/events';
 import { ticketsAPI, type GetMyTicketsResponse } from '@/lib/api/tickets';
 import { CACHE_KEYS, getCached, setCached } from '@/lib/cache';
-import { getEventImageUrl, getProfileImageUrl } from '@/lib/utils/imageUtils';
+import { getEventImageUrl, getProfileImageUrl, EVENT_PLACEHOLDER } from '@/lib/utils/imageUtils';
 import { useAppStore } from '@/store/useAppStore';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -461,7 +461,7 @@ export default function EventDetailsScreen() {
           onPress={() => setShowImageViewer(true)}
         >
           <Image
-            source={{ uri: getEventImageUrl(event) || 'https://via.placeholder.com/400' }}
+            source={{ uri: getEventImageUrl(event) || EVENT_PLACEHOLDER }}
             className="w-full h-full"
             resizeMode="cover"
           />
@@ -933,7 +933,7 @@ export default function EventDetailsScreen() {
           onPress={() => setShowImageViewer(false)}
         >
           <Image
-            source={{ uri: getEventImageUrl(event) || 'https://via.placeholder.com/400' }}
+            source={{ uri: getEventImageUrl(event) || EVENT_PLACEHOLDER }}
             style={{
               width: Dimensions.get('window').width,
               height: Dimensions.get('window').height,
