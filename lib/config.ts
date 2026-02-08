@@ -74,10 +74,10 @@ const getApiBaseUrl = (): string => {
 };
 // /
 // Use the environment-aware function for automatic URL detection
-// export const API_BASE_URL = getApiBaseUrl();
+export const API_BASE_URL = getApiBaseUrl();
 // Or hardcode production URL for all devices:
 // export const API_BASE_URL = "https://ticketly-backend-oem4.onrender.com/api";
-export const API_BASE_URL = "http://localhost:5001/api";
+// export const API_BASE_URL = "http://localhost:5001/api";
 
 // Image base URL for Cloudinary relative paths (set EXPO_PUBLIC_IMAGE_BASE_URL in .env)
 const IMAGE_BASE_URL = process.env.EXPO_PUBLIC_IMAGE_BASE_URL || '';
